@@ -185,7 +185,7 @@ function tierAccent(tier: string) {
 function sortLabel(sortKey: SortKey) {
   if (sortKey === "pnl") return "PnL";
   if (sortKey === "wins") return "Wins";
-  if (sortKey === "win_rate") return "Positive Rate";
+  if (sortKey === "win_rate") return "Win Rate";
   return "Net Wins";
 }
 
