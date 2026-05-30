@@ -370,15 +370,17 @@ export default function SubscriberDashboardPage() {
 
   const [countryHeatRows, setCountryHeatRows] = useState<
   {
-    country: string;
-    traders: number;
-    total_pnl: number;
-    wins: number;
-    losses: number;
-    breakevens: number;
-    total_trades: number;
-    avg_win_rate: number;
-  }[]
+  country: string;
+  traders: number;
+  subscribers: number;
+  visible_leaderboard_subscribers: number;
+  total_pnl: number;
+  wins: number;
+  losses: number;
+  breakevens: number;
+  total_trades: number;
+  avg_win_rate: number;
+}[]
 >([]);
   const [countryHeatLoading, setCountryHeatLoading] = useState(false);
 
@@ -678,15 +680,19 @@ const countryActive = (othersInCountry ?? 0) > 0;
     }
 
     const rows = ((data ?? []) as any[]).map((r) => ({
-      country: String(r.country ?? ""),
-      traders: Number(r.traders ?? 0),
-      total_pnl: Number(r.total_pnl ?? 0),
-      wins: Number(r.wins ?? 0),
-      losses: Number(r.losses ?? 0),
-      breakevens: Number(r.breakevens ?? 0),
-      total_trades: Number(r.total_trades ?? 0),
-      avg_win_rate: Number(r.avg_win_rate ?? 0),
-    }));
+  country: String(r.country ?? ""),
+  traders: Number(r.traders ?? 0),
+  subscribers: Number(r.subscribers ?? r.traders ?? 0),
+  visible_leaderboard_subscribers: Number(
+    r.visible_leaderboard_subscribers ?? r.traders ?? 0
+  ),
+  total_pnl: Number(r.total_pnl ?? 0),
+  wins: Number(r.wins ?? 0),
+  losses: Number(r.losses ?? 0),
+  breakevens: Number(r.breakevens ?? 0),
+  total_trades: Number(r.total_trades ?? 0),
+  avg_win_rate: Number(r.avg_win_rate ?? 0),
+}));
 
     setCountryHeatRows(rows);
   } finally {
