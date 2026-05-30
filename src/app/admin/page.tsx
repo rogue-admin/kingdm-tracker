@@ -199,7 +199,7 @@ export default function AdminPage() {
     setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
-      options: { redirectTo: "http://localhost:3000/auth/callback" },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) setError(error.message);
   }

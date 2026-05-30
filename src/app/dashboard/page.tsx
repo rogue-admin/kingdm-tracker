@@ -587,7 +587,7 @@ const countryActive = (othersInCountry ?? 0) > 0;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
-      options: { redirectTo: "http://localhost:3000/auth/callback" },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
 
     if (error) setError(error.message);
