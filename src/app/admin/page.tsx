@@ -154,7 +154,7 @@ export default function AdminPage() {
   const winsRef = useRef<HTMLInputElement | null>(null);
   const lossesRef = useRef<HTMLInputElement | null>(null);
   const beRef = useRef<HTMLInputElement | null>(null);
-  const notesRef = useRef<HTMLTextAreaElement | null>(null);
+  const notesRef = useRef<HTMLInputElement | null>(null);
 
   // -------------------------
   // Auth bootstrap
