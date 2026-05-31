@@ -1578,357 +1578,6 @@ async function searchLocations(q: string) {
 
       {signedIn && verified === true && (
         <>
-                    {/* Local community counts (privacy-safe) */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-            <div style={miniCard()}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 900, color: THEME.gold }}>Your area</div>
-                {cityBadge && (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 900,
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      border: `1px solid ${THEME.border}`,
-                      background: "rgba(255,255,255,0.04)",
-                      color: cityActive ? THEME.green : "rgba(255,255,255,0.82)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {cityBadge}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900 }}>
-                {areaLabel}
-              </div>
-
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  opacity: 0.88,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  color: cityActive ? THEME.green : "rgba(255,255,255,0.75)",
-                }}
-              >
-                <span style={pulseDotStyle(cityActive)} />
-                <span>{cityMessage}</span>
-                <button
-  type="button"
-  onClick={() => {
-    setLocationSearch(areaLabel !== "Not set" ? areaLabel : "");
-setSelectedLocation(null);
-setLocationResults([]);
-setShowLocationEditor((v) => !v);
-  }}
-  style={{
-    marginTop: 10,
-    ...btn(false),
-    padding: "6px 10px",
-    fontSize: 12,
-  }}
->
-  {showLocationEditor ? "Cancel" : "Edit Location"}
-</button>
-              </div>
-            </div>
-
-            <div style={miniCard()}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 900, color: THEME.gold }}>Country</div>
-                {countryBadge && (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 900,
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      border: `1px solid ${THEME.border}`,
-                      background: "rgba(255,255,255,0.04)",
-                      color: countryActive ? THEME.green : "rgba(255,255,255,0.82)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {countryBadge}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900 }}>
-                {myCountry ?? "Not set"}
-              </div>
-
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  opacity: 0.88,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  color: countryActive ? THEME.green : "rgba(255,255,255,0.75)",
-                }}
-              >
-                <span style={pulseDotStyle(countryActive)} />
-                <span>{countryMessage}</span>
-              </div>
-            </div>
-          </div>
-
-          {showLocationEditor && (
-  <div style={{ ...panel(), marginBottom: 14 }}>
-    <div style={{ fontWeight: 900, fontSize: 16, color: THEME.gold }}>
-      Profile Location
-    </div>
-
-    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.72 }}>
-      Used for country, city, nearby trader, and heatmap rankings.
-    </div>
-
-    <div
-      style={{
-        marginTop: 14,
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr auto",
-        gap: 10,
-        alignItems: "end",
-      }}
-    >
-
-      <div style={{ position: "relative" }}>
-  <input
-    value={locationSearch}
-    onChange={(e) => {
-      setSelectedLocation(null);
-      searchLocations(e.target.value);
-    }}
-    placeholder="Search city, state, country..."
-    style={{
-      width: "100%",
-      padding: "12px",
-      borderRadius: 12,
-      border: `1px solid ${THEME.borderStrong}`,
-      background: "rgba(255,255,255,0.03)",
-      color: "white",
-      fontWeight: 800,
-    }}
-  />
-
-  {locationResults.length > 0 && (
-    <div
-      style={{
-        position: "absolute",
-        top: "100%",
-        left: 0,
-        right: 0,
-        marginTop: 6,
-        borderRadius: 12,
-        border: `1px solid ${THEME.border}`,
-        background: "rgba(10,10,10,0.98)",
-        overflow: "hidden",
-        zIndex: 100,
-        boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
-      }}
-    >
-      {locationResults.map((loc) => (
-        <button
-          key={loc.id}
-          type="button"
-          onClick={() => {
-            setSelectedLocation(loc);
-            setLocationSearch(
-              `${loc.city}, ${loc.state_code ?? ""}, ${loc.country}`
-            );
-            setLocationResults([]);
-          }}
-          style={{
-            width: "100%",
-            textAlign: "left",
-            padding: "10px 12px",
-            border: "none",
-            borderBottom: `1px solid ${THEME.border}`,
-            background:
-              selectedLocation?.id === loc.id
-                ? THEME.goldSoft
-                : "transparent",
-            color: "white",
-            cursor: "pointer",
-          }}
-        >
-          <div style={{ fontWeight: 800 }}>
-            {loc.city}
-            {loc.state_code ? `, ${loc.state_code}` : ""}
-          </div>
-
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
-            {loc.country}
-          </div>
-        </button>
-      ))}
-    </div>
-  )}
-</div>
-
-
-      <button
-        type="button"
-        onClick={async () => {
-  if (!selectedLocation) {
-    toastErr("Select a location first.");
-    return;
-  }
-
-  setLocationSaving(true);
-
-  try {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ location_id: selectedLocation.id })
-      .eq("id", userId);
-
-    if (error) throw error;
-
-    toastOk("Location saved");
-    setShowLocationEditor(false);
-
-    await Promise.all([
-      loadLocalCommunityCounts(),
-      loadNearbyLeaders(),
-      loadCountryHeatMap(),
-    ]);
-  } catch (e: any) {
-    console.error(e);
-    toastErr(e?.message ?? "Failed to save location.");
-  } finally {
-    setLocationSaving(false);
-  }
-}}
-        disabled={locationSaving}
-        style={{
-          ...btn(true),
-          height: 40,
-          opacity: locationSaving ? 0.7 : 1,
-        }}
-      >
-        {locationSaving ? "Saving..." : "Save"}
-      </button>
-    </div>
-  </div>
-)}
-
-  <div style={{ ...panel(), marginBottom: 14 }}>
-  <div
-    style={{
-      fontWeight: 900,
-      fontSize: 16,
-      color: THEME.gold,
-    }}
-  >
-    Public Visibility
-  </div>
-
-  <div
-    style={{
-      marginTop: 6,
-      fontSize: 12,
-      opacity: 0.75,
-    }}
-  >
-    Control whether your profile appears on public leaderboards,
-    maps, and community rankings.
-  </div>
-
-  <div
-    style={{
-      marginTop: 14,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 16,
-    }}
-  >
-    <div>
-      <div style={{ fontWeight: 800 }}>
-        Show me publicly
-      </div>
-
-      <div
-        style={{
-          fontSize: 12,
-          opacity: 0.7,
-          marginTop: 4,
-        }}
-      >
-        Allows your display name, location, and performance
-        statistics to appear in community views.
-      </div>
-    </div>
-
-    <input
-      type="checkbox"
-      checked={participatesInLeaderboard}
-      onChange={toggleLeaderboardVisibility}
-      style={{
-        width: 22,
-        height: 22,
-        cursor: "pointer",
-      }}
-    />
-  </div>
-</div>
-
-<div style={{ ...panel(), marginBottom: 14 }}>
-  <div style={{ fontWeight: 900, fontSize: 16, color: THEME.gold }}>
-    Public Visibility
-  </div>
-
-  <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
-    Control whether your display name, location, and submitted performance appear in community leaderboards, maps, and nearby trader rankings.
-  </div>
-
-  <div
-    style={{
-      marginTop: 14,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 16,
-    }}
-  >
-    <div>
-      <div style={{ fontWeight: 900 }}>
-        Show me publicly
-      </div>
-
-      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.7 }}>
-        You can still use your private dashboard even when this is off.
-      </div>
-    </div>
-
-    <button
-      type="button"
-      onClick={toggleLeaderboardVisibility}
-      disabled={visibilitySaving}
-      style={{
-        ...btn(participatesInLeaderboard),
-        minWidth: 96,
-        opacity: visibilitySaving ? 0.65 : 1,
-        color: participatesInLeaderboard ? THEME.gold : "white",
-      }}
-    >
-      {visibilitySaving
-        ? "Saving..."
-        : participatesInLeaderboard
-        ? "Visible"
-        : "Hidden"}
-    </button>
-  </div>
-</div>
 
           <div style={{ height: 16 }} />
 
@@ -2608,12 +2257,336 @@ setShowLocationEditor((v) => !v);
   </>
 )}
 </div>
+<div style={{ height: 20 }} />
+
+<h2
+  style={{
+    color: THEME.gold,
+    fontSize: 18,
+    fontWeight: 900,
+    marginBottom: 12,
+  }}
+>
+  Profile & Privacy
+</h2>
+async function loadUSStateHeatMap() {
+  if (!signedIn || verified !== true) return;
+
+  try {
+    const [{ data: presence }, { data: performance }] = await Promise.all([
+      supabase.from("v_public_us_state_presence").select("*"),
+      supabase.from("v_public_us_state_performance").select("*"),
+    ]);
+
+    setUsStatePresenceRows(presence ?? []);
+    setUsStatePerformanceRows(performance ?? []);
+  } catch (e) {
+    console.error("loadUSStateHeatMap error:", e);
+    setUsStatePresenceRows([]);
+    setUsStatePerformanceRows([]);
+  }
+}
+
+
+                    {/* Local community counts (privacy-safe) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div style={miniCard()}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 900, color: THEME.gold }}>Your area</div>
+                {cityBadge && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      border: `1px solid ${THEME.border}`,
+                      background: "rgba(255,255,255,0.04)",
+                      color: cityActive ? THEME.green : "rgba(255,255,255,0.82)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {cityBadge}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900 }}>
+                {areaLabel}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  opacity: 0.88,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: cityActive ? THEME.green : "rgba(255,255,255,0.75)",
+                }}
+              >
+                <span style={pulseDotStyle(cityActive)} />
+                <span>{cityMessage}</span>
+                <button
+  type="button"
+  onClick={() => {
+    setLocationSearch(areaLabel !== "Not set" ? areaLabel : "");
+setSelectedLocation(null);
+setLocationResults([]);
+setShowLocationEditor((v) => !v);
+  }}
+  style={{
+    marginTop: 10,
+    ...btn(false),
+    padding: "6px 10px",
+    fontSize: 12,
+  }}
+>
+  {showLocationEditor ? "Cancel" : "Edit Location"}
+</button>
+              </div>
+            </div>
+
+            <div style={miniCard()}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 900, color: THEME.gold }}>Country</div>
+                {countryBadge && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      border: `1px solid ${THEME.border}`,
+                      background: "rgba(255,255,255,0.04)",
+                      color: countryActive ? THEME.green : "rgba(255,255,255,0.82)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {countryBadge}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900 }}>
+                {myCountry ?? "Not set"}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  opacity: 0.88,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: countryActive ? THEME.green : "rgba(255,255,255,0.75)",
+                }}
+              >
+                <span style={pulseDotStyle(countryActive)} />
+                <span>{countryMessage}</span>
+              </div>
+            </div>
+          </div>
+
+          {showLocationEditor && (
+  <div style={{ ...panel(), marginBottom: 14 }}>
+    <div style={{ fontWeight: 900, fontSize: 16, color: THEME.gold }}>
+      Profile Location
+    </div>
+
+    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.72 }}>
+      Used for country, city, nearby trader, and heatmap rankings.
+    </div>
+
+    <div
+      style={{
+        marginTop: 14,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr auto",
+        gap: 10,
+        alignItems: "end",
+      }}
+    >
+
+      <div style={{ position: "relative" }}>
+  <input
+    value={locationSearch}
+    onChange={(e) => {
+      setSelectedLocation(null);
+      searchLocations(e.target.value);
+    }}
+    placeholder="Search city, state, country..."
+    style={{
+      width: "100%",
+      padding: "12px",
+      borderRadius: 12,
+      border: `1px solid ${THEME.borderStrong}`,
+      background: "rgba(255,255,255,0.03)",
+      color: "white",
+      fontWeight: 800,
+    }}
+  />
+
+  {locationResults.length > 0 && (
+    <div
+      style={{
+        position: "absolute",
+        top: "100%",
+        left: 0,
+        right: 0,
+        marginTop: 6,
+        borderRadius: 12,
+        border: `1px solid ${THEME.border}`,
+        background: "rgba(10,10,10,0.98)",
+        overflow: "hidden",
+        zIndex: 100,
+        boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
+      }}
+    >
+      {locationResults.map((loc) => (
+        <button
+          key={loc.id}
+          type="button"
+          onClick={() => {
+            setSelectedLocation(loc);
+            setLocationSearch(
+              `${loc.city}, ${loc.state_code ?? ""}, ${loc.country}`
+            );
+            setLocationResults([]);
+          }}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "10px 12px",
+            border: "none",
+            borderBottom: `1px solid ${THEME.border}`,
+            background:
+              selectedLocation?.id === loc.id
+                ? THEME.goldSoft
+                : "transparent",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontWeight: 800 }}>
+            {loc.city}
+            {loc.state_code ? `, ${loc.state_code}` : ""}
+          </div>
+
+          <div style={{ fontSize: 12, opacity: 0.7 }}>
+            {loc.country}
+          </div>
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
+
+      <button
+        type="button"
+        onClick={async () => {
+  if (!selectedLocation) {
+    toastErr("Select a location first.");
+    return;
+  }
+
+  setLocationSaving(true);
+
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ location_id: selectedLocation.id })
+      .eq("id", userId);
+
+    if (error) throw error;
+
+    toastOk("Location saved");
+    setShowLocationEditor(false);
+
+    await Promise.all([
+      loadLocalCommunityCounts(),
+      loadNearbyLeaders(),
+      loadCountryHeatMap(),
+    ]);
+  } catch (e: any) {
+    console.error(e);
+    toastErr(e?.message ?? "Failed to save location.");
+  } finally {
+    setLocationSaving(false);
+  }
+}}
+        disabled={locationSaving}
+        style={{
+          ...btn(true),
+          height: 40,
+          opacity: locationSaving ? 0.7 : 1,
+        }}
+      >
+        {locationSaving ? "Saving..." : "Save"}
+      </button>
+    </div>
+  </div>
+)}
+
+ 
+<div style={{ ...panel(), marginBottom: 14 }}>
+  <div style={{ fontWeight: 900, fontSize: 16, color: THEME.gold }}>
+    Public Visibility
+  </div>
+
+  <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+    Control whether your display name, location, and submitted performance appear in community leaderboards, maps, and nearby trader rankings.
+  </div>
+
+  <div
+    style={{
+      marginTop: 14,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 16,
+    }}
+  >
+    <div>
+      <div style={{ fontWeight: 900 }}>
+        Show me publicly
+      </div>
+
+      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.7 }}>
+        You can still use your private dashboard even when this is off.
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={toggleLeaderboardVisibility}
+      disabled={visibilitySaving}
+      style={{
+        ...btn(participatesInLeaderboard),
+        minWidth: 96,
+        opacity: visibilitySaving ? 0.65 : 1,
+        color: participatesInLeaderboard ? THEME.gold : "white",
+      }}
+    >
+      {visibilitySaving
+        ? "Saving..."
+        : participatesInLeaderboard
+        ? "Visible"
+        : "Hidden"}
+    </button>
+  </div>
+</div>
 
         </>
       )}
     </main>
   );
 }
+
+
 
 
 // -------------------------
