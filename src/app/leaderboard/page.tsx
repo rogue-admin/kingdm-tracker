@@ -1056,7 +1056,7 @@ function endSnapshotDrag() {
             options={[
               { value: "pnl", label: "PnL" },
               { value: "wins", label: "Wins" },
-              { value: "win_rate", label: "Positive Rate" },
+              { value: "win_rate", label: "Win Rate" },
               { value: "net_wins", label: "Net Wins" },
             ]}
           />
