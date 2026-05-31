@@ -1463,7 +1463,49 @@ async function searchLocations(q: string) {
       {status && <div style={{ color: THEME.green, marginBottom: 10 }}>{status}</div>}
       {error && <div style={{ color: THEME.red, marginBottom: 10 }}>{error}</div>}
 
-      {!signedIn && <div style={panel()}>Please sign in to view your dashboard.</div>}
+      {!signedIn && (
+  <div style={{ ...panel(), padding: 24, marginTop: 16 }}>
+    <div style={{ fontSize: 22, fontWeight: 950, color: THEME.gold }}>
+      Welcome to The Kingdm Trade Tracker
+    </div>
+
+    <div style={{ marginTop: 8, fontSize: 14, opacity: 0.82 }}>
+      Sign in with Discord to unlock your subscriber dashboard.
+    </div>
+
+    <ul
+      style={{
+        marginTop: 16,
+        marginBottom: 18,
+        paddingLeft: 20,
+        lineHeight: "28px",
+        opacity: 0.88,
+        fontSize: 14,
+      }}
+    >
+      <li>Your Discord role automatically unlocks access</li>
+      <li>View your personal trading calendar</li>
+      <li>Track Tokyo, London, and NYC session performance</li>
+      <li>Compare your progress with the community</li>
+      <li>See regional activity and nearby trader rankings</li>
+    </ul>
+
+    <button
+      onClick={signIn}
+      style={{
+        ...btn(true),
+        padding: "12px 18px",
+        fontSize: 15,
+        fontWeight: 900,
+        color: THEME.gold,
+        borderColor: "rgba(215,177,74,0.42)",
+        boxShadow: `0 0 22px ${THEME.goldSoft}`,
+      }}
+    >
+      Sign in with Discord
+    </button>
+  </div>
+)}
 
       {signedIn && verified === false && (
         <div style={panel()}>
@@ -2122,7 +2164,9 @@ setShowLocationEditor((v) => !v);
         </>
       )}
 
-      {/* Right Drawer */}
+                  {signedIn && verified === true && (
+        <>
+          {/* Right Drawer */}
       <div
         onClick={() => closeDrawer()}
         style={{
@@ -2395,6 +2439,9 @@ setShowLocationEditor((v) => !v);
   </>
 )}
 </div>
+
+        </>
+      )}
     </main>
   );
 }
