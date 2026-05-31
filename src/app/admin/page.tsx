@@ -125,6 +125,8 @@ export default function AdminPage() {
   // Auth / debug
   const [signedIn, setSignedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Form state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -159,6 +161,7 @@ export default function AdminPage() {
   // -------------------------
   // Auth bootstrap
   // -------------------------
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
 
@@ -170,20 +173,47 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+  async function checkAdmin() {
+    setCheckingAdmin(true);
+
     if (!signedIn) {
       setUserId(null);
+      setIsAdmin(false);
+      setCheckingAdmin(false);
       return;
     }
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (error) {
-        console.error(error);
-        setUserId(null);
-        return;
-      }
-      setUserId(data.user?.id ?? null);
-    });
-  }, [signedIn]);
 
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error || !data.user) {
+      setUserId(null);
+      setIsAdmin(false);
+      setCheckingAdmin(false);
+      return;
+    }
+
+    setUserId(data.user.id);
+
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (profileErr) {
+      console.error(profileErr);
+      setIsAdmin(false);
+    } else {
+      setIsAdmin(profile?.is_admin === true);
+    }
+
+    setCheckingAdmin(false);
+  }
+
+  checkAdmin();
+}, [signedIn]);
+
+ 
   useEffect(() => {
   if (editingId !== null) {
     const t = window.setTimeout(() => {
@@ -228,8 +258,10 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    loadRecent();
-  }, []);
+  if (!signedIn) return;
+  if (!isAdmin) return;
+  loadRecent();
+}, [signedIn, isAdmin]);
 
   // -------------------------
   // Helpers
@@ -402,7 +434,44 @@ function onNumberFieldKeyDown(
   // -------------------------
   // UI
   // -------------------------
+if (checkingAdmin) {
   return (
+    <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 1180, margin: "0 auto", color: "white" }}>
+      <h1 style={{ color: THEME.gold }}>The Kingdm</h1>
+      <p>Checking admin access…</p>
+    </main>
+  );
+}
+
+if (!signedIn) {
+  return (
+    <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 1180, margin: "0 auto", color: "white" }}>
+      <h1 style={{ color: THEME.gold }}>The Kingdm</h1>
+      <h2>Admin Dashboard</h2>
+      <p>You must sign in to access this page.</p>
+
+      <button onClick={signIn} style={primaryBtnStyle}>
+        Sign in with Discord
+      </button>
+    </main>
+  );
+}
+
+if (!isAdmin) {
+  return (
+    <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 1180, margin: "0 auto", color: "white" }}>
+      <h1 style={{ color: THEME.gold }}>The Kingdm</h1>
+      <h2>Access denied</h2>
+      <p>You do not have Staff/Admin access.</p>
+
+      <button onClick={signOut} style={smallBtnStyle}>
+        Sign out
+      </button>
+    </main>
+  );
+}
+
+return (
   <main
     style={{
       padding: 24,
