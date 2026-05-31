@@ -2269,24 +2269,6 @@ async function searchLocations(q: string) {
 >
   Profile & Privacy
 </h2>
-async function loadUSStateHeatMap() {
-  if (!signedIn || verified !== true) return;
-
-  try {
-    const [{ data: presence }, { data: performance }] = await Promise.all([
-      supabase.from("v_public_us_state_presence").select("*"),
-      supabase.from("v_public_us_state_performance").select("*"),
-    ]);
-
-    setUsStatePresenceRows(presence ?? []);
-    setUsStatePerformanceRows(performance ?? []);
-  } catch (e) {
-    console.error("loadUSStateHeatMap error:", e);
-    setUsStatePresenceRows([]);
-    setUsStatePerformanceRows([]);
-  }
-}
-
 
                     {/* Local community counts (privacy-safe) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
