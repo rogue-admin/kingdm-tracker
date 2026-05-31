@@ -382,7 +382,7 @@ export default function SubscriberDashboardPage() {
   avg_win_rate: number;
 }[]
 >([]);
-  const [countryHeatLoading, setCountryHeatLoading] = useState(false);
+  const [, setCountryHeatLoading] = useState(false);
 
   const [usStatePresenceRows, setUsStatePresenceRows] = useState<any[]>([]);
   const [usStatePerformanceRows, setUsStatePerformanceRows] = useState<any[]>([]);
@@ -390,7 +390,7 @@ export default function SubscriberDashboardPage() {
   const [myStateCode, setMyStateCode] = useState<string | null>(null);
 
   const [showNearbyLeaders, setShowNearbyLeaders] = useState(false);
-  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [, setNearbyLoading] = useState(false);
   const [cityLeaders, setCityLeaders] = useState<GeoLeaderboardRow[]>([]);
   const [stateLeaders, setStateLeaders] = useState<GeoLeaderboardRow[]>([]);
   const [countryLeaders, setCountryLeaders] = useState<GeoLeaderboardRow[]>([]);
@@ -403,7 +403,7 @@ export default function SubscriberDashboardPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [verifying, setVerifying] = useState(false);
+  const [, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -432,12 +432,15 @@ export default function SubscriberDashboardPage() {
   const [othersInCountry, setOthersInCountry] = useState<number | null>(null);
 
   const [showLocationEditor, setShowLocationEditor] = useState(false);
+  
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [locationSaving, setLocationSaving] = useState(false);
-
+  const [participatesInLeaderboard, setParticipatesInLeaderboard] = useState(false);
+  
   const [locationSearch, setLocationSearch] = useState("");
   const [locationResults, setLocationResults] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
-  const [locationSearching, setLocationSearching] = useState(false);
+  const [, setLocationSearching] = useState(false);
   
 
 
@@ -905,6 +908,62 @@ async function loadUSStateHeatMap() {
   setOthersInCountry(countryRes.count ?? 0);
 } 
 
+async function loadVisibilityPreference() {
+  if (!userId) return;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("participates_in_leaderboard")
+    .eq("id", userId)
+    .single();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setParticipatesInLeaderboard(
+    !!data?.participates_in_leaderboard
+  );
+}
+
+async function toggleLeaderboardVisibility() {
+  if (!userId) return;
+
+  const next = !participatesInLeaderboard;
+
+  setParticipatesInLeaderboard(next);
+  setVisibilitySaving(true);
+
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        participates_in_leaderboard: next,
+      })
+      .eq("id", userId);
+
+    if (error) throw error;
+
+    toastOk(
+      next
+        ? "Public visibility enabled"
+        : "Public visibility disabled"
+    );
+  } catch (e: any) {
+    console.error(e);
+
+    setParticipatesInLeaderboard(!next);
+
+    toastErr(
+      e?.message ??
+        "Failed to update visibility"
+    );
+  } finally {
+    setVisibilitySaving(false);
+  }
+}
+
 async function searchLocations(q: string) {
   setLocationSearch(q);
 
@@ -1097,6 +1156,7 @@ async function searchLocations(q: string) {
     loadNearbyLeaders(),
     loadCountryHeatMap(),
     loadUSStateHeatMap(),
+    loadVisibilityPreference(),
   ]);
 }
 
@@ -1759,7 +1819,116 @@ setShowLocationEditor((v) => !v);
       </button>
     </div>
   </div>
-)}                    
+)}
+
+  <div style={{ ...panel(), marginBottom: 14 }}>
+  <div
+    style={{
+      fontWeight: 900,
+      fontSize: 16,
+      color: THEME.gold,
+    }}
+  >
+    Public Visibility
+  </div>
+
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      opacity: 0.75,
+    }}
+  >
+    Control whether your profile appears on public leaderboards,
+    maps, and community rankings.
+  </div>
+
+  <div
+    style={{
+      marginTop: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+    }}
+  >
+    <div>
+      <div style={{ fontWeight: 800 }}>
+        Show me publicly
+      </div>
+
+      <div
+        style={{
+          fontSize: 12,
+          opacity: 0.7,
+          marginTop: 4,
+        }}
+      >
+        Allows your display name, location, and performance
+        statistics to appear in community views.
+      </div>
+    </div>
+
+    <input
+      type="checkbox"
+      checked={participatesInLeaderboard}
+      onChange={toggleLeaderboardVisibility}
+      style={{
+        width: 22,
+        height: 22,
+        cursor: "pointer",
+      }}
+    />
+  </div>
+</div>
+
+<div style={{ ...panel(), marginBottom: 14 }}>
+  <div style={{ fontWeight: 900, fontSize: 16, color: THEME.gold }}>
+    Public Visibility
+  </div>
+
+  <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+    Control whether your display name, location, and submitted performance appear in community leaderboards, maps, and nearby trader rankings.
+  </div>
+
+  <div
+    style={{
+      marginTop: 14,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 16,
+    }}
+  >
+    <div>
+      <div style={{ fontWeight: 900 }}>
+        Show me publicly
+      </div>
+
+      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.7 }}>
+        You can still use your private dashboard even when this is off.
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={toggleLeaderboardVisibility}
+      disabled={visibilitySaving}
+      style={{
+        ...btn(participatesInLeaderboard),
+        minWidth: 96,
+        opacity: visibilitySaving ? 0.65 : 1,
+        color: participatesInLeaderboard ? THEME.gold : "white",
+      }}
+    >
+      {visibilitySaving
+        ? "Saving..."
+        : participatesInLeaderboard
+        ? "Visible"
+        : "Hidden"}
+    </button>
+  </div>
+</div>
 
           <div style={{ height: 16 }} />
 
