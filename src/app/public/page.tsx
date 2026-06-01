@@ -932,15 +932,15 @@ useEffect(() => {
         id: "london-emmitt",
         coach: "Emmitt",
         session: "London Session",
-        etTime: "03:50",
+        etTime: "02:50",
         days: [1, 2, 3, 4],
-        instruments: "Gold and GER30",
+        instruments: "Oil, GER30 and Gold",
       },
       {
         id: "nyc-mamba",
         coach: "Mamba",
         session: "NYC Session",
-        etTime: "09:20",
+        etTime: "09:25",
         days: [1, 2, 3, 4],
         instruments: "US30 and NASDAQ",
       },
@@ -1741,7 +1741,7 @@ async function openAllTimeSummary() {
               letterSpacing: 0.2,
             }}
         >
-            Public Win | Loss Calendar
+            Trade Tracker Calendar
           </div>
       </h1>
       
