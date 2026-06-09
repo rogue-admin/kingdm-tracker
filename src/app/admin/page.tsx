@@ -398,13 +398,37 @@ function onNumberFieldKeyDown(
       .select()
       .maybeSingle();
 
-    if (error) return setError(error.message);
-    if (!data) return setError("Upsert failed (unexpected).");
+   if (error) return setError(error.message);
+if (!data) return setError("Upsert failed (unexpected).");
 
-    // Optionally lock into edit mode by keeping the id
-    setEditingId(data.id);
-    setStatus("Saved ✅");
-    await loadRecent();
+// Post result to Discord
+try {
+  const { error: discordError } = await supabase.functions.invoke(
+    "post-session-result",
+    {
+      body: {
+        date,
+        session,
+        wins: winsN,
+        losses: lossesN,
+        breakevens: breakevensN,
+        notes: notes.trim() || null,
+      },
+    }
+  );
+
+  if (discordError) {
+    console.error("Discord post failed:", discordError);
+  }
+} catch (e) {
+  console.error("Discord invoke failed:", e);
+}
+
+// Optionally lock into edit mode by keeping the id
+setEditingId(data.id);
+
+setStatus("Saved ✅");
+await loadRecent();
   } finally {
     setLoading(false);
   }
