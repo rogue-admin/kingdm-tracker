@@ -78,13 +78,13 @@ export async function GET(req: Request) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 22,
+              gap: 18,
             }}
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="92"
-              height="92"
+              width="112"
+              height="112"
             />
 
             <div

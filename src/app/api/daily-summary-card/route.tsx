@@ -165,7 +165,7 @@ export async function GET(req: Request) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <img src={`${BASE_URL}/Kingdm-logo.png`} width="100" height="100" />
+            <img src={`${BASE_URL}/Kingdm-logo.png`} width="112" height="112" />
 
             <div style={{ display: "flex", flexDirection: "column" }}>
               <div
