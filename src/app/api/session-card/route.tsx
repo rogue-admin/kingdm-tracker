@@ -2,12 +2,39 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
+const BASE_URL = "https://kingdm-tracker.vercel.app";
+
 function sessionInfo(session: string) {
   const s = session.toLowerCase();
 
-  if (s === "tokyo") return { label: "TOKYO SESSION", flag: "🇯🇵" };
-  if (s === "london") return { label: "LONDON SESSION", flag: "🇬🇧" };
-  return { label: "NYC SESSION", flag: "🇺🇸" };
+  if (s === "tokyo") {
+    return {
+      label: "TOKYO SESSION",
+      flag: "🇯🇵",
+      accent: "#ff4d5a",
+      glow: "rgba(255,77,90,0.12)",
+    };
+  }
+
+  if (s === "london") {
+    return {
+      label: "LONDON SESSION",
+      flag: "🇬🇧",
+      accent: "#2f7cff",
+      glow: "rgba(47,124,255,0.12)",
+    };
+  }
+
+  return {
+    label: "NYC SESSION",
+    flag: "🇺🇸",
+    accent: "#9b4dff",
+    glow: "rgba(155,77,255,0.12)",
+  };
+}
+
+function fmtNet(n: number) {
+  return n >= 0 ? `+${n}` : String(n);
 }
 
 export async function GET(req: Request) {
@@ -27,35 +54,103 @@ export async function GET(req: Request) {
     (
       <div
         style={{
-  width: "1200px",
-  height: "630px",
-  backgroundColor: "rgb(9, 9, 11)",
-  backgroundImage:
-    "radial-gradient(circle at 20% 20%, rgba(140,95,255,0.35), rgba(0,0,0,0) 35%), radial-gradient(circle at 80% 20%, rgba(215,177,74,0.30), rgba(0,0,0,0) 35%)",
-  color: "white",
-  display: "flex",
-  flexDirection: "column",
-  padding: "64px",
-  fontFamily: "Arial",
-}}
+          width: "1200px",
+          height: "630px",
+          backgroundColor: "rgb(9,9,11)",
+          backgroundImage:
+            "radial-gradient(circle at 18% 14%, rgba(140,95,255,0.28), rgba(0,0,0,0) 34%), radial-gradient(circle at 88% 12%, rgba(215,177,74,0.22), rgba(0,0,0,0) 36%)",
+          color: "white",
+          display: "flex",
+          flexDirection: "column",
+          padding: "54px 60px",
+          fontFamily: "Arial",
+        }}
       >
-        <div style={{ color: "#D7B14A", display: "flex", fontSize: 52, fontWeight: 900 }}>
-          The Kingdm
-        </div>
-
-        <div style={{ marginTop: 16, display: "flex", fontSize: 72, fontWeight: 900 }}>
-          {info.flag} {info.label}
-        </div>
-
-        <div style={{ marginTop: 10, display: "flex", fontSize: 32, opacity: 0.75 }}>
-          {date}
-        </div>
-
+        {/* Header */}
         <div
           style={{
-            marginTop: 52,
             display: "flex",
-            gap: "28px",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 22,
+            }}
+          >
+            <img
+              src={`${BASE_URL}/Kingdm-logo.png`}
+              width="92"
+              height="92"
+            />
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  color: "#D7B14A",
+                  fontSize: 34,
+                  fontWeight: 900,
+                  lineHeight: 1.05,
+                }}
+              >
+                The Kingdm
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  marginTop: 8,
+                  fontSize: 58,
+                  fontWeight: 900,
+                  lineHeight: 1.0,
+                }}
+              >
+                <span>{info.flag}</span>
+                <span>{info.label}</span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: 10,
+                  fontSize: 20,
+                  opacity: 0.62,
+                }}
+              >
+                Official Session Results
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              fontSize: 28,
+              opacity: 0.78,
+              paddingTop: 8,
+            }}
+          >
+            {date}
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div
+          style={{
+            marginTop: 34,
+            display: "flex",
+            gap: 24,
           }}
         >
           <Stat label="TP Hits" value={wins} color="#55FF8A" />
@@ -63,20 +158,70 @@ export async function GET(req: Request) {
           <Stat label="Break Even" value={be} color="#D7B14A" />
         </div>
 
+        {/* Net result pill */}
         <div
           style={{
-            marginTop: 40,
+            marginTop: 30,
+            borderRadius: "30px",
+            border: `2px solid ${info.accent}`,
+            backgroundColor: info.glow,
             display: "flex",
-            fontSize: 54,
-            fontWeight: 900,
-            color: positive ? "#55FF8A" : "#ff5c5c",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "24px 30px",
           }}
         >
-          Net Day Result: {positive ? `+${net}` : net}
-        </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                color: "#D7B14A",
+                fontSize: 22,
+                fontWeight: 900,
+                letterSpacing: 0.4,
+              }}
+            >
+              SESSION RESULT
+            </div>
 
-        <div style={{ marginTop: "auto", display: "flex", fontSize: 22, opacity: 0.55, paddingTop: 20, }}>
-          Kingdm Trade Tracker Calendar • kingdm-tracker.vercel.app
+            <div
+              style={{
+                display: "flex",
+                marginTop: 10,
+                fontSize: 72,
+                fontWeight: 900,
+                color: positive ? "#55FF8A" : "#ff5c5c",
+                lineHeight: 1,
+              }}
+            >
+              {fmtNet(net)}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              width: "2px",
+              height: "92px",
+              backgroundColor: "rgba(255,255,255,0.12)",
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              gap: 34,
+            }}
+          >
+            <MiniStat label="TP" value={wins} color="#55FF8A" />
+            <MiniStat label="SL" value={losses} color="#ff5c5c" />
+            <MiniStat label="BE" value={be} color="#D7B14A" />
+          </div>
         </div>
       </div>
     ),
@@ -99,19 +244,81 @@ function Stat({
   return (
     <div
       style={{
-  width: "300px",
-  height: "150px",
-  borderRadius: "28px",
-  border: `2px solid ${color}`,
-  backgroundColor: "rgba(255,255,255,0.04)",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-  padding: "28px",
-}}
+        width: "344px",
+        height: "146px",
+        borderRadius: "28px",
+        border: `2px solid ${color}`,
+        backgroundColor: "rgba(255,255,255,0.035)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "24px 28px",
+      }}
     >
-      <div style={{ color, fontSize: 28, fontWeight: 900 }}>{label}</div>
-      <div style={{ marginTop: 16, display: "flex", fontSize: 54, fontWeight: 900 }}>
+      <div
+        style={{
+          display: "flex",
+          color,
+          fontSize: 26,
+          fontWeight: 900,
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          marginTop: 16,
+          fontSize: 56,
+          fontWeight: 900,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        minWidth: "58px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          color,
+          fontSize: 22,
+          fontWeight: 900,
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          marginTop: 8,
+          fontSize: 46,
+          fontWeight: 900,
+          lineHeight: 1,
+        }}
+      >
         {value}
       </div>
     </div>
