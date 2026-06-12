@@ -140,6 +140,8 @@ export default function AdminPage() {
 
   // UI state
   const [loading, setLoading] = useState(false);
+  const [publishingSession, setPublishingSession] = useState(false);
+  const [publishingDaily, setPublishingDaily] = useState(false);
   const [loadedEntry, setLoadedEntry] = useState<OfficialSessionRow | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -398,41 +400,91 @@ function onNumberFieldKeyDown(
       .select()
       .maybeSingle();
 
-   if (error) return setError(error.message);
-if (!data) return setError("Upsert failed (unexpected).");
+    if (error) return setError(error.message);
+    if (!data) return setError("Upsert failed (unexpected).");
 
-// Post result to Discord
-try {
-  const { error: discordError } = await supabase.functions.invoke(
-    "post-session-result",
-    {
-      body: {
-        date,
-        session,
-        wins: winsN,
-        losses: lossesN,
-        breakevens: breakevensN,
-        notes: notes.trim() || null,
-      },
-    }
-  );
-
-  if (discordError) {
-    console.error("Discord post failed:", discordError);
-  }
-} catch (e) {
-  console.error("Discord invoke failed:", e);
-}
-
-// Optionally lock into edit mode by keeping the id
-setEditingId(data.id);
-
-setStatus("Saved ✅");
-await loadRecent();
+    // Optionally lock into edit mode by keeping the id
+    setEditingId(data.id);
+    setStatus("Saved ✅");
+    await loadRecent();
   } finally {
     setLoading(false);
   }
 }
+
+  async function publishSessionToDiscord() {
+    setStatus(null);
+    setError(null);
+
+    if (!date) return setError("Date is required.");
+    if (winsN === null) return setError("Wins must be a non-negative whole number.");
+    if (lossesN === null) return setError("Losses must be a non-negative whole number.");
+    if (breakevensN === null) return setError("Break-evens must be a non-negative whole number.");
+
+    const ok = window.confirm(
+      `Publish ${session.toUpperCase()} session result for ${date} to Discord?`
+    );
+    if (!ok) return;
+
+    setPublishingSession(true);
+    try {
+      const { error: discordError } = await supabase.functions.invoke(
+        "post-session-result",
+        {
+          body: {
+            date,
+            session,
+            wins: winsN,
+            losses: lossesN,
+            breakevens: breakevensN,
+            notes: notes.trim() || null,
+          },
+        }
+      );
+
+      if (discordError) {
+        setError(`Discord publish failed: ${discordError.message}`);
+        return;
+      }
+
+      setStatus("Published session to Discord ✅");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Discord publish failed.");
+    } finally {
+      setPublishingSession(false);
+    }
+  }
+
+  async function publishDailySummaryToDiscord() {
+    setStatus(null);
+    setError(null);
+
+    if (!date) return setError("Date is required.");
+
+    const ok = window.confirm(`Publish Daily Summary for ${date} to Discord?`);
+    if (!ok) return;
+
+    setPublishingDaily(true);
+    try {
+      const { error: discordError } = await supabase.functions.invoke(
+        "post-daily-summary",
+        {
+          body: { date },
+        }
+      );
+
+      if (discordError) {
+        setError(`Daily summary publish failed: ${discordError.message}`);
+        return;
+      }
+
+      setStatus("Published daily summary to Discord ✅");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Daily summary publish failed.");
+    } finally {
+      setPublishingDaily(false);
+    }
+  }
 
   async function remove(id: number) {
     const ok = window.confirm("Delete this row? This cannot be undone (for now).");
@@ -1075,6 +1127,47 @@ border: "1px solid rgba(215,177,74,0.18)",
   }}
 >
   {loading ? "Saving..." : editingId === null ? "Add Session" : "Save Changes"}
+</button>
+
+<button
+  type="button"
+  onClick={publishSessionToDiscord}
+  disabled={loading || publishingSession || winsN === null || lossesN === null || breakevensN === null}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(85,255,138,0.22)",
+    background: publishingSession
+      ? "rgba(255,255,255,0.06)"
+      : "linear-gradient(135deg, rgba(85,255,138,0.16), rgba(255,255,255,0.05))",
+    color: "white",
+    cursor:
+      loading || publishingSession || winsN === null || lossesN === null || breakevensN === null
+        ? "not-allowed"
+        : "pointer",
+    fontWeight: 900,
+  }}
+>
+  {publishingSession ? "Publishing..." : "Publish Session to Discord"}
+</button>
+
+<button
+  type="button"
+  onClick={publishDailySummaryToDiscord}
+  disabled={loading || publishingDaily}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(215,177,74,0.24)",
+    background: publishingDaily
+      ? "rgba(255,255,255,0.06)"
+      : "linear-gradient(135deg, rgba(215,177,74,0.18), rgba(255,255,255,0.05))",
+    color: "white",
+    cursor: loading || publishingDaily ? "not-allowed" : "pointer",
+    fontWeight: 900,
+  }}
+>
+  {publishingDaily ? "Publishing..." : "Publish Daily Summary"}
 </button>
 
   {editingId !== null && (
