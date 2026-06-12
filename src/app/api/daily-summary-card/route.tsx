@@ -40,6 +40,30 @@ function sessionName(s: Session) {
   return "🇺🇸 NYC";
 }
 
+function sessionColor(s: Session) {
+  if (s === "tokyo") {
+    return {
+      border: "rgba(255,77,77,0.58)",
+      accent: "#ff4d4d",
+      bg: "rgba(255,77,77,0.035)",
+    };
+  }
+
+  if (s === "london") {
+    return {
+      border: "rgba(59,130,246,0.62)",
+      accent: "#3b82f6",
+      bg: "rgba(59,130,246,0.035)",
+    };
+  }
+
+  return {
+    border: "rgba(168,85,247,0.62)",
+    accent: "#a855f7",
+    bg: "rgba(168,85,247,0.035)",
+  };
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const date = url.searchParams.get("date") ?? iso(new Date());
@@ -129,92 +153,161 @@ export async function GET(req: Request) {
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "48px 58px",
+          padding: "18px 58px 26px 58px",
           fontFamily: "Arial",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-            <img src={`${BASE_URL}/Kingdm-logo.png`} width="88" height="88" />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img src={`${BASE_URL}/Kingdm-logo.png`} width="100" height="100" />
+
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ color: "#D7B14A", fontSize: 38, fontWeight: 900 }}>
+              <div
+                style={{
+                  display: "flex",
+                  color: "#D7B14A",
+                  fontSize: 34,
+                  fontWeight: 900,
+                }}
+              >
                 The Kingdm
               </div>
-              <div style={{ fontSize: 52, fontWeight: 900 }}>
+
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 42,
+                  fontWeight: 900,
+                }}
+              >
                 Daily Recap
+              </div>
+
+              <div
+                style={{
+                  marginTop: 0,
+                  display: "flex",
+                  fontSize: 17,
+                  color: "rgba(255,255,255,0.55)",
+                  fontWeight: 700,
+                }}
+              >
+                Official Session Results
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", fontSize: 30, opacity: 0.72 }}>
+          <div style={{ display: "flex", fontSize: 29, opacity: 0.72 }}>
             {date}
           </div>
         </div>
 
         <div
           style={{
-            marginTop: 36,
-            borderRadius: "30px",
-            border: "2px solid rgba(85,255,138,0.55)",
-            backgroundColor: "rgba(85,255,138,0.08)",
+            marginTop: 8,
+            borderRadius: "28px",
+            border: "2px solid rgba(215,177,74,0.55)",
+            backgroundColor: "rgba(215,177,74,0.06)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "30px 34px",
+            padding: "16px 44px",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ color: "#D7B14A", fontSize: 24, fontWeight: 900 }}>
-              TOTAL DAY RESULT
-            </div>
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: 76,
-                fontWeight: 900,
-                color: dailyNet >= 0 ? "#55FF8A" : "#ff5c5c",
-              }}
-            >
-              {fmtNet(dailyNet)}
-            </div>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 94,
+              fontWeight: 900,
+              lineHeight: 1,
+              color: dailyNet >= 0 ? "#55FF8A" : "#ff5c5c",
+            }}
+          >
+            {fmtNet(dailyNet)}
           </div>
 
-          <div style={{ display: "flex", gap: 30 }}>
+          <div
+            style={{
+              display: "flex",
+              width: "1px",
+              height: "68px",
+              backgroundColor: "rgba(255,255,255,0.18)",
+            }}
+          />
+
+          <div style={{ display: "flex", gap: 38 }}>
             <MiniStat label="TP" value={daily.w} color="#55FF8A" />
             <MiniStat label="SL" value={daily.l} color="#ff5c5c" />
             <MiniStat label="BE" value={daily.be} color="#D7B14A" />
-            <MiniStat label="WR" value={winRate(daily.w, daily.l)} color="#D7B14A" />
+            <MiniStat
+              label="WR"
+              value={winRate(daily.w, daily.l)}
+              color="#D7B14A"
+            />
           </div>
         </div>
 
-        <div style={{ marginTop: 28, display: "flex", gap: 18 }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 28 }}>
           {(["tokyo", "london", "nyc"] as Session[]).map((s) => {
             const r = bySession[s];
             const n = r.w - r.l;
+            const c = sessionColor(s);
+
             return (
               <div
                 key={s}
                 style={{
                   flex: 1,
-                  borderRadius: "22px",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  backgroundColor: "rgba(255,255,255,0.04)",
+                  borderRadius: "20px",
+                  border: `2px solid ${c.border}`,
+                  backgroundColor: c.bg,
                   display: "flex",
                   flexDirection: "column",
-                  padding: "20px",
+                  padding: "14px 18px",
                 }}
               >
-                <div style={{ display: "flex", color: "#D7B14A", fontSize: 26, fontWeight: 900 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    color: c.accent,
+                    fontSize: 26,
+                    fontWeight: 900,
+                  }}
+                >
                   {sessionName(s)}
                 </div>
-                <div style={{ marginTop: 12, display: "flex", fontSize: 23 }}>
+
+                <div
+                  style={{
+                    marginTop: 9,
+                    display: "flex",
+                    fontSize: 22,
+                  }}
+                >
                   TP {r.w} • SL {r.l} • BE {r.be}
                 </div>
+
+                <div
+                  style={{
+                    marginTop: 9,
+                    display: "flex",
+                    width: "100%",
+                    height: "1px",
+                    backgroundColor: c.border,
+                  }}
+                />
+
                 <div
                   style={{
                     marginTop: 10,
                     display: "flex",
-                    fontSize: 34,
+                    fontSize: 30,
                     fontWeight: 900,
                     color: n >= 0 ? "#55FF8A" : "#ff5c5c",
                   }}
@@ -226,21 +319,14 @@ export async function GET(req: Request) {
           })}
         </div>
 
-        <div style={{ marginTop: 26, display: "flex", gap: 18 }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 28 }}>
           <TrendBox title="Week to Date" net={weekNet} w={week.w} l={week.l} />
-          <TrendBox title="Month to Date" net={monthNet} w={month.w} l={month.l} />
-        </div>
-
-        <div
-          style={{
-            marginTop: "auto",
-            display: "flex",
-            justifyContent: "flex-end",
-            fontSize: 20,
-            opacity: 0.5,
-          }}
-        >
-          Kingdm Trade Tracker • kingdm-tracker.vercel.app
+          <TrendBox
+            title="Month to Date"
+            net={monthNet}
+            w={month.w}
+            l={month.l}
+          />
         </div>
       </div>
     ),
@@ -258,9 +344,27 @@ function MiniStat({
   color: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ color, fontSize: 24, fontWeight: 900 }}>{label}</div>
-      <div style={{ marginTop: 6, fontSize: 42, fontWeight: 900 }}>{value}</div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+    >
+      <div style={{ display: "flex", color, fontSize: 26, fontWeight: 900 }}>
+        {label}
+      </div>
+
+      <div
+        style={{
+          marginTop: 6,
+          display: "flex",
+          fontSize: 40,
+          fontWeight: 900,
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -281,17 +385,34 @@ function TrendBox({
       style={{
         flex: 1,
         borderRadius: "20px",
-        border: "1px solid rgba(215,177,74,0.25)",
-        backgroundColor: "rgba(215,177,74,0.06)",
+        border: "1px solid rgba(215,177,74,0.55)",
+        backgroundColor: "rgba(215,177,74,0.055)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "18px 24px",
+        padding: "12px 22px",
       }}
     >
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ color: "#D7B14A", fontSize: 24, fontWeight: 900 }}>{title}</div>
-        <div style={{ marginTop: 6, fontSize: 22, opacity: 0.72 }}>
+        <div
+          style={{
+            display: "flex",
+            color: "#D7B14A",
+            fontSize: 25,
+            fontWeight: 900,
+          }}
+        >
+          {title}
+        </div>
+
+        <div
+          style={{
+            marginTop: 5,
+            display: "flex",
+            fontSize: 20,
+            opacity: 0.72,
+          }}
+        >
           TP {w} • SL {l} • WR {winRate(w, l)}
         </div>
       </div>
@@ -299,7 +420,16 @@ function TrendBox({
       <div
         style={{
           display: "flex",
-          fontSize: 42,
+          width: "1px",
+          height: "48px",
+          backgroundColor: "rgba(255,255,255,0.18)",
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          fontSize: 40,
           fontWeight: 900,
           color: net >= 0 ? "#55FF8A" : "#ff5c5c",
         }}
