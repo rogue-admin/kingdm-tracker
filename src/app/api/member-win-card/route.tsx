@@ -223,8 +223,8 @@ export async function GET(req: Request) {
                 <div
                   style={{
                     display: "flex",
-                    fontSize: 38,
-                    fontWeight: 900,
+                    fontSize: 42,
+                    fontWeight: 950,
                     lineHeight: 1.05,
                   }}
                 >
