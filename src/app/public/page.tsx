@@ -157,7 +157,6 @@ function getHotStreakMap(calendarMap: Map<string, DailyOverallRow>) {
   const dates = Array.from(calendarMap.keys()).sort();
 
   let streak = 0;
-  let prevIso: string | null = null;
 
   for (const iso of dates) {
     const row = calendarMap.get(iso);
@@ -168,35 +167,168 @@ function getHotStreakMap(calendarMap: Map<string, DailyOverallRow>) {
     const be = safeNum(row.breakevens);
     const total = w + l + be;
 
+    // Unreported days do not count and do not break the run.
     if (total <= 0) {
-      streak = 0;
-      prevIso = null;
       streakMap.set(iso, 0);
       continue;
     }
 
+    // Any loss breaks the run.
     if (l > 0) {
       streak = 0;
-      prevIso = iso;
       streakMap.set(iso, 0);
       continue;
     }
 
-    let continues = false;
-
-    if (prevIso) {
-      continues = previousTradingDateISO(iso) === prevIso;
-    }
-
-    streak = continues ? streak + 1 : 1;
-
+    // Any reported day with zero losses continues the run.
+    streak += 1;
     streakMap.set(iso, streak);
-
-    prevIso = iso;
   }
 
   return streakMap;
 }
+
+type NoLossRuns = Record<"overall" | Session, number>;
+
+function emptyNoLossRuns(): NoLossRuns {
+  return {
+    overall: 0,
+    tokyo: 0,
+    london: 0,
+    nyc: 0,
+  };
+}
+
+function hasReportedOutcome(w: number, l: number, be: number) {
+  return w + l + be > 0;
+}
+
+function getCurrentOverallNoLossRun(rows: DailyOverallRow[]) {
+  const cleaned = rows
+    .map((r) => ({
+      date: String(r.date),
+      wins: safeNum(r.wins),
+      losses: safeNum(r.losses),
+      breakevens: safeNum(r.breakevens),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let streak = 0;
+
+  for (const r of cleaned) {
+    if (!hasReportedOutcome(r.wins, r.losses, r.breakevens)) continue;
+
+    if (r.losses > 0) {
+      streak = 0;
+    } else {
+      streak += 1;
+    }
+  }
+
+  return streak;
+}
+
+function getCurrentSessionNoLossRuns(rows: DailySessionRow[]) {
+  const runs: Record<Session, number> = {
+    tokyo: 0,
+    london: 0,
+    nyc: 0,
+  };
+
+  (["tokyo", "london", "nyc"] as Session[]).forEach((session) => {
+    const cleaned = rows
+      .filter((r) => r.session === session)
+      .map((r) => ({
+        date: String(r.date),
+        wins: safeNum(r.wins),
+        losses: safeNum(r.losses),
+        breakevens: safeNum(r.breakevens),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    let streak = 0;
+
+    for (const r of cleaned) {
+      if (!hasReportedOutcome(r.wins, r.losses, r.breakevens)) continue;
+
+      if (r.losses > 0) {
+        streak = 0;
+      } else {
+        streak += 1;
+      }
+    }
+
+    runs[session] = streak;
+  });
+
+  return runs;
+}
+
+function getSessionNoLossRunMaps(
+  sessionMap: Map<string, Map<Session, DailySessionRow>>
+) {
+  const maps: Record<Session, Map<string, number>> = {
+    tokyo: new Map<string, number>(),
+    london: new Map<string, number>(),
+    nyc: new Map<string, number>(),
+  };
+
+  (["tokyo", "london", "nyc"] as Session[]).forEach((session) => {
+    const rows: Array<{
+      date: string;
+      wins: number;
+      losses: number;
+      breakevens: number;
+    }> = [];
+
+    sessionMap.forEach((perDay, iso) => {
+      const r = perDay.get(session);
+      if (!r) return;
+
+      rows.push({
+        date: iso,
+        wins: safeNum(r.wins),
+        losses: safeNum(r.losses),
+        breakevens: safeNum(r.breakevens),
+      });
+    });
+
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+
+    let streak = 0;
+
+    for (const r of rows) {
+      if (!hasReportedOutcome(r.wins, r.losses, r.breakevens)) {
+        maps[session].set(r.date, 0);
+        continue;
+      }
+
+      if (r.losses > 0) {
+        streak = 0;
+        maps[session].set(r.date, 0);
+        continue;
+      }
+
+      streak += 1;
+      maps[session].set(r.date, streak);
+    }
+  });
+
+  return maps;
+}
+
+function sessionMomentumLabel(s: Session) {
+  if (s === "tokyo") return "🇯🇵 Tokyo";
+  if (s === "london") return "🇬🇧 London";
+  return "🇺🇸 NYC";
+}
+
+function sessionMomentumColor(s: Session) {
+  if (s === "tokyo") return THEME.tokyoRed;
+  if (s === "london") return THEME.blue;
+  return THEME.purple;
+}
+
 
 function mondayOfISO(iso: string) {
   const d = new Date(iso + "T00:00:00");
@@ -855,6 +987,9 @@ export default function PublicDashboardPage() {
   >(new Map());
 
   const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [noLossRuns, setNoLossRuns] = useState<NoLossRuns>(() =>
+  emptyNoLossRuns()
+    );
   const [trackerHighlights, setTrackerHighlights] =
     useState<TrackerHighlightStats | null>(null);
 
@@ -1104,6 +1239,11 @@ useEffect(() => {
     [calendarMap]
   );
 
+  const sessionNoLossRunMaps = useMemo(
+    () => getSessionNoLossRunMaps(sessionMap),
+    [sessionMap]
+  );
+
   const calendarRange = useMemo(() => {
     const start = startOfCalendarGrid(monthCursor);
     const end = endOfCalendarGrid(monthCursor);
@@ -1167,6 +1307,41 @@ useEffect(() => {
 
   return { tp, sl, be, net, winRate };
 }, [calendarMap, monthCursor]);
+
+const momentumItems = useMemo(() => {
+  const minRunToShow = 2;
+
+  const items: Array<{
+    key: string;
+    label: string;
+    value: number;
+    color: string;
+  }> = [];
+
+  if (noLossRuns.overall >= minRunToShow) {
+    items.push({
+      key: "overall",
+      label: "🔥 Overall",
+      value: noLossRuns.overall,
+      color: THEME.gold,
+    });
+  }
+
+  (["tokyo", "london", "nyc"] as Session[]).forEach((s) => {
+    const value = noLossRuns[s];
+
+    if (value >= minRunToShow) {
+      items.push({
+        key: s,
+        label: `${sessionMomentumLabel(s)} 🔥`,
+        value,
+        color: sessionMomentumColor(s),
+      });
+    }
+  });
+
+  return items;
+}, [noLossRuns]);
 
   const selectedDay = useMemo(() => {
     if (!selectedISO) return null;
@@ -1331,49 +1506,63 @@ const summaryBestSession = useMemo(() => {
   }
 
   async function loadStreakYtd() {
-    const now = new Date();
-    const startISO = `${now.getFullYear()}-01-01`;
-    const endISO = toISODate(now);
+  const endISO = toISODate(new Date());
 
-    const res = await supabase
+  // Use a long lookback so streaks can survive month/year boundaries.
+  const startISO = "2000-01-01";
+
+  const [overallRes, sessionRes] = await Promise.all([
+    supabase
       .from("v_public_daily_overall")
       .select("date, wins, losses, breakevens")
       .gte("date", startISO)
       .lte("date", endISO)
-      .order("date", { ascending: true });
+      .order("date", { ascending: true }),
 
-    if (res.error) throw res.error;
+    supabase
+      .from("v_public_daily_outcomes")
+      .select("date, session, wins, losses, breakevens")
+      .gte("date", startISO)
+      .lte("date", endISO)
+      .order("date", { ascending: true }),
+  ]);
 
-    const rows: DailyOverallRow[] = ((res.data ?? []) as DailyOverallRow[]).map((r) => ({
-      date: String(r.date),
-      wins: safeNum(r.wins),
-      losses: safeNum(r.losses),
-      breakevens: safeNum(r.breakevens),
-    }));
+  if (overallRes.error) throw overallRes.error;
+  if (sessionRes.error) throw sessionRes.error;
 
-    let streak = 0;
+  const overallRows: DailyOverallRow[] = (
+    (overallRes.data ?? []) as DailyOverallRow[]
+  ).map((r) => ({
+    date: String(r.date),
+    wins: safeNum(r.wins),
+    losses: safeNum(r.losses),
+    breakevens: safeNum(r.breakevens),
+  }));
 
-    for (let i = 0; i < rows.length; i++) {
-      const d = new Date(rows[i].date + "T00:00:00");
-      if (isWeekendDate(d)) continue;
+  const sessionRows: DailySessionRow[] = (
+    (sessionRes.data ?? []) as DailySessionRow[]
+  ).map((r) => ({
+    date: String(r.date),
+    session: r.session,
+    wins: safeNum(r.wins),
+    losses: safeNum(r.losses),
+    breakevens: safeNum(r.breakevens),
+  }));
 
-      const w = safeNum(rows[i].wins);
-      const l = safeNum(rows[i].losses);
-      const be = safeNum(rows[i].breakevens);
+  const sessionRuns = getCurrentSessionNoLossRuns(sessionRows);
 
-      const hasAny = w + l + be > 0;
+  const runs: NoLossRuns = {
+    overall: getCurrentOverallNoLossRun(overallRows),
+    tokyo: sessionRuns.tokyo,
+    london: sessionRuns.london,
+    nyc: sessionRuns.nyc,
+  };
 
-      if (!hasAny) continue;
+  setNoLossRuns(runs);
 
-      if (l > 0) {
-        streak = 0;
-      } else {
-        streak += 1;
-      }
-    }
-
-    setCurrentStreak(streak);
-  }
+  // Keep this for any old UI references.
+  setCurrentStreak(runs.overall);
+}
 
   async function refreshAll() {
     await Promise.all([
@@ -1781,22 +1970,36 @@ async function openAllTimeSummary() {
     flex: "1 1 auto",
   }}
 >
-      <span
-        style={{
-          border: `1px solid ${THEME.border}`,
-          background: THEME.panel2,
-          borderRadius: 999,
-          padding: "7px 11px",
-          fontWeight: 900,
-          opacity: 0.95,
-        }}
-        title="Current win-streak (days without a loss)"
-      >
-        🔥 Streak:{" "}
+      {momentumItems.length > 0 && (
+  <span
+    style={{
+      border: `1px solid rgba(215,177,74,0.24)`,
+      background:
+        "linear-gradient(135deg, rgba(215,177,74,0.10), rgba(255,255,255,0.025))",
+      borderRadius: 999,
+      padding: "7px 11px",
+      fontWeight: 900,
+      opacity: 0.98,
+      display: "inline-flex",
+      gap: 10,
+      alignItems: "center",
+      flexWrap: "wrap",
+      boxShadow: "0 0 18px rgba(215,177,74,0.08)",
+    }}
+    title="Active no-loss runs. Break-evens do not break a run; any loss ends it."
+  >
+    <span style={{ color: THEME.gold }}>Momentum:</span>
+
+    {momentumItems.map((item) => (
+      <span key={item.key} style={{ color: item.color }}>
+        {item.label}{" "}
         <span style={{ color: THEME.gold }}>
-          {fmtInt(currentStreak)}
+          {fmtInt(item.value)}
         </span>
       </span>
+    ))}
+  </span>
+)}
 
       {trackerHighlights?.bestDay && (
         <span
@@ -4146,6 +4349,8 @@ async function openAllTimeSummary() {
       const breakevens = safeNum(r?.breakevens);
       const wr = winRatePct(wins, losses);
       const label = s.toUpperCase();
+      const sessionRun =
+        selectedISO ? sessionNoLossRunMaps[s].get(selectedISO) ?? 0 : 0;
 
       return (
         <div
@@ -4176,15 +4381,37 @@ async function openAllTimeSummary() {
             }}
           >
             <div
-              style={{
-                fontWeight: 950,
-                fontSize: 16,
-                color: THEME.gold,
-                letterSpacing: 0.4,
-              }}
-            >
-              {label}
-            </div>
+  style={{
+    fontWeight: 950,
+    fontSize: 16,
+    color: THEME.gold,
+    letterSpacing: 0.4,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  }}
+>
+  <span>{label}</span>
+
+  {sessionRun > 1 && (
+    <span
+      title={`${label} no-loss run: ${sessionRun}`}
+      style={{
+        color: THEME.gold,
+        fontSize: 13,
+        fontWeight: 950,
+        padding: "3px 7px",
+        borderRadius: 999,
+        border: "1px solid rgba(215,177,74,0.24)",
+        background: "rgba(215,177,74,0.08)",
+        lineHeight: 1,
+      }}
+    >
+      🔥{sessionRun}
+    </span>
+  )}
+</div>
 
             <div
               style={{
