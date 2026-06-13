@@ -2,90 +2,69 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-type Session = "tokyo" | "london" | "nyc";
+const BASE_URL = "https://kingdm-tracker.vercel.app";
 
-function safeNumber(value: string | null) {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+function sessionMeta(session: string) {
+  const s = session.toLowerCase();
 
-function formatMoney(value: number) {
-  const absolute = Math.abs(value).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  if (value > 0) return `+$${absolute}`;
-  if (value < 0) return `-$${absolute}`;
-
-  return "$0.00";
-}
-
-function getSessionInfo(value: string) {
-  const session = value.toLowerCase() as Session;
-
-  if (session === "tokyo") {
+  if (s === "tokyo") {
     return {
-      label: "Tokyo",
+      label: "Tokyo Session",
       flag: "🇯🇵",
       accent: "#ff5c5c",
-      border: "rgba(255,92,92,0.52)",
-      background: "rgba(255,92,92,0.055)",
     };
   }
 
-  if (session === "london") {
+  if (s === "london") {
     return {
-      label: "London",
+      label: "London Session",
       flag: "🇬🇧",
-      accent: "#5ab4ff",
-      border: "rgba(90,180,255,0.52)",
-      background: "rgba(90,180,255,0.055)",
+      accent: "#4ea3ff",
     };
   }
 
   return {
-    label: "NYC",
+    label: "NYC Session",
     flag: "🇺🇸",
-    accent: "#aa6eff",
-    border: "rgba(170,110,255,0.52)",
-    background: "rgba(170,110,255,0.055)",
+    accent: "#a855f7",
   };
+}
+
+function formatMoney(value: number) {
+  const abs = Math.abs(value).toFixed(2);
+  return value >= 0 ? `+$${abs}` : `-$${abs}`;
+}
+
+function getInitial(name: string) {
+  return (name || "?").trim().charAt(0).toUpperCase();
 }
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
 
-  const displayName = (
-    url.searchParams.get("name") ?? "Kingdm Trader"
-  ).slice(0, 48);
-
-  const tier =
-    url.searchParams.get("tier") === "Elite Knight"
-      ? "Elite Knight"
-      : "Knight";
-
+  const member = url.searchParams.get("member") ?? "Kingdm Trader";
+  const tier = url.searchParams.get("tier") ?? "Knight";
+  const session = url.searchParams.get("session") ?? "nyc";
+  const amount = Number(url.searchParams.get("amount") ?? 0);
   const date = url.searchParams.get("date") ?? "";
-  const amount = safeNumber(url.searchParams.get("amount"));
-  const sessionInfo = getSessionInfo(
-    url.searchParams.get("session") ?? "nyc"
-  );
+  const avatarUrl = url.searchParams.get("avatarUrl") ?? "";
 
-  const origin = url.origin;
+  const meta = sessionMeta(session);
+  const money = formatMoney(amount);
 
   return new ImageResponse(
     (
       <div
         style={{
           width: "1200px",
-          height: "420px",
-          padding: "42px 58px",
+          height: "630px",
           backgroundColor: "rgb(9,9,11)",
           backgroundImage:
-            "radial-gradient(circle at 17% 12%, rgba(140,95,255,0.30), rgba(0,0,0,0) 38%), radial-gradient(circle at 86% 8%, rgba(215,177,74,0.27), rgba(0,0,0,0) 40%)",
+            "radial-gradient(circle at 16% 14%, rgba(140,95,255,0.30), rgba(0,0,0,0) 34%), radial-gradient(circle at 86% 12%, rgba(215,177,74,0.24), rgba(0,0,0,0) 36%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
+          padding: "56px 58px",
           fontFamily: "Arial",
         }}
       >
@@ -93,21 +72,22 @@ export async function GET(req: Request) {
         <div
           style={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
+            alignItems: "flex-start",
           }}
         >
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 17,
+              gap: 22,
             }}
           >
             <img
-              src={`${origin}/Kingdm-logo.png`}
-              width="108"
-              height="108"
+              src={`${BASE_URL}/Kingdm-logo.png`}
+              width="104"
+              height="104"
+              style={{ display: "flex" }}
             />
 
             <div
@@ -120,8 +100,9 @@ export async function GET(req: Request) {
                 style={{
                   display: "flex",
                   color: "#D7B14A",
-                  fontSize: 34,
+                  fontSize: 38,
                   fontWeight: 900,
+                  lineHeight: 1,
                 }}
               >
                 The Kingdm
@@ -129,9 +110,9 @@ export async function GET(req: Request) {
 
               <div
                 style={{
-                  marginTop: 3,
                   display: "flex",
-                  fontSize: 46,
+                  marginTop: 10,
+                  fontSize: 60,
                   fontWeight: 900,
                   lineHeight: 1,
                 }}
@@ -145,68 +126,109 @@ export async function GET(req: Request) {
             style={{
               display: "flex",
               fontSize: 28,
-              opacity: 0.72,
+              opacity: 0.75,
+              paddingTop: 8,
             }}
           >
             {date}
           </div>
         </div>
 
-        {/* Member win panel */}
+        {/* Main Card */}
         <div
           style={{
-            marginTop: 25,
-            flex: 1,
-            borderRadius: "27px",
-            border: `2px solid ${sessionInfo.border}`,
-            background:
-              `linear-gradient(135deg, rgba(140,95,255,0.08), ${sessionInfo.background})`,
-            padding: "24px 32px",
+            marginTop: 52,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            borderRadius: 30,
+            border: `2px solid ${meta.accent}`,
+            backgroundColor: "rgba(255,255,255,0.03)",
+            padding: "30px 32px",
           }}
         >
-          {/* Member */}
+          {/* Left side */}
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              minWidth: 0,
-              width: "48%",
+              alignItems: "center",
+              width: "52%",
             }}
           >
             <div
               style={{
-                alignSelf: "flex-start",
                 display: "flex",
-                borderRadius: "999px",
-                border: "1px solid rgba(215,177,74,0.34)",
-                backgroundColor: "rgba(215,177,74,0.09)",
-                color:
-                  tier === "Elite Knight"
-                    ? "#D7B14A"
-                    : "#C7CDD8",
-                fontSize: 18,
-                fontWeight: 900,
-                padding: "6px 12px",
+                alignItems: "center",
+                gap: 22,
+                width: "100%",
               }}
             >
-              {tier}
-            </div>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  width="84"
+                  height="84"
+                  style={{
+                    display: "flex",
+                    borderRadius: "999px",
+                    border: `2px solid ${meta.accent}`,
+                    objectFit: "cover",
+                    backgroundColor: "#111827",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    width: 84,
+                    height: 84,
+                    borderRadius: 999,
+                    border: `2px solid ${meta.accent}`,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 34,
+                    fontWeight: 900,
+                    backgroundColor: "#111827",
+                  }}
+                >
+                  {getInitial(member)}
+                </div>
+              )}
 
-            <div
-              style={{
-                marginTop: 13,
-                display: "flex",
-                fontSize: 44,
-                fontWeight: 900,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {displayName}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignSelf: "flex-start",
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(215,177,74,0.38)",
+                    backgroundColor: "rgba(215,177,74,0.08)",
+                    color: "#D7B14A",
+                    fontSize: 22,
+                    fontWeight: 700,
+                  }}
+                >
+                  {tier}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    fontSize: 34,
+                    fontWeight: 900,
+                    lineHeight: 1.05,
+                  }}
+                >
+                  {member}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -214,51 +236,44 @@ export async function GET(req: Request) {
           <div
             style={{
               display: "flex",
-              width: "1px",
-              height: "105px",
-              backgroundColor: "rgba(255,255,255,0.14)",
+              width: 1,
+              height: 120,
+              backgroundColor: "rgba(255,255,255,0.16)",
             }}
           />
 
-          {/* Session result */}
+          {/* Right side */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "flex-end",
-              width: "42%",
+              justifyContent: "center",
+              width: "38%",
+              gap: 12,
             }}
           >
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 10,
-                color: sessionInfo.accent,
-                fontSize: 27,
-                fontWeight: 900,
+                color: meta.accent,
+                fontSize: 26,
+                fontWeight: 700,
               }}
             >
-              <div style={{ display: "flex" }}>
-                {sessionInfo.flag}
-              </div>
-
-              <div style={{ display: "flex" }}>
-                {sessionInfo.label} Session
-              </div>
+              {meta.flag} {meta.label}
             </div>
 
             <div
               style={{
-                marginTop: 15,
                 display: "flex",
-                color: amount >= 0 ? "#55FF8A" : "#ff5c5c",
-                fontSize: 62,
+                fontSize: 64,
                 fontWeight: 900,
+                color: amount >= 0 ? "#55FF8A" : "#ff5c5c",
                 lineHeight: 1,
               }}
             >
-              {formatMoney(amount)}
+              {money}
             </div>
           </div>
         </div>
@@ -266,7 +281,7 @@ export async function GET(req: Request) {
     ),
     {
       width: 1200,
-      height: 420,
+      height: 630,
     }
   );
 }
