@@ -64,8 +64,9 @@ export async function GET(req: Request) {
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "56px 58px",
+          padding: "40px 58px",
           fontFamily: "Arial",
+          justifyContent: "center",
         }}
       >
         {/* Header */}
@@ -137,14 +138,15 @@ export async function GET(req: Request) {
         {/* Main Card */}
         <div
           style={{
-            marginTop: 52,
+            marginTop: 36,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             borderRadius: 30,
             border: `2px solid ${meta.accent}`,
             backgroundColor: "rgba(255,255,255,0.03)",
-            padding: "30px 32px",
+            padding: "34px 36px",
+            minHeight: 210,
           }}
         >
           {/* Left side */}
@@ -166,8 +168,8 @@ export async function GET(req: Request) {
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
-                  width="84"
-                  height="84"
+                  width="96"
+                  height="96"
                   style={{
                     display: "flex",
                     borderRadius: "999px",
@@ -180,13 +182,13 @@ export async function GET(req: Request) {
                 <div
                   style={{
                     display: "flex",
-                    width: 84,
-                    height: 84,
+                    width: 96,
+                    height: 96,
                     borderRadius: 999,
                     border: `2px solid ${meta.accent}`,
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 34,
+                    fontSize: 38,
                     fontWeight: 900,
                     backgroundColor: "#111827",
                   }}
