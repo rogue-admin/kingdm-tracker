@@ -204,26 +204,26 @@ export async function GET(req: Request) {
                   gap: 14,
                 }}
               >
-                <div
-                  style={{
+            <div
+                style={{
                     display: "flex",
                     alignSelf: "flex-start",
-                    padding: "8px 16px",
+                    padding: "6px 12px",
                     borderRadius: 999,
-                    border: "1px solid rgba(215,177,74,0.38)",
+                    border: "1px solid rgba(215,177,74,0.32)",
                     backgroundColor: "rgba(215,177,74,0.08)",
                     color: "#D7B14A",
-                    fontSize: 22,
-                    fontWeight: 700,
-                  }}
-                >
-                  {tier}
-                </div>
+                    fontSize: 18,
+                    fontWeight: 600,
+                    }}
+               >
+                   {tier}
+               </div>
 
                 <div
                   style={{
                     display: "flex",
-                    fontSize: 34,
+                    fontSize: 38,
                     fontWeight: 900,
                     lineHeight: 1.05,
                   }}
