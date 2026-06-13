@@ -326,21 +326,83 @@ function usFederalHolidayMap(year: number) {
 }
 
 // -------------------------
-// Month sparkline helper (SVG points)
+// Interactive monthly equity chart
 // -------------------------
-function buildSparklinePoints(values: number[], w = 240, h = 44, pad = 4) {
-  if (!values.length) return "";
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+type EquityDatum = {
+  iso: string;
+  daily: number;
+  cumulative: number;
+};
+
+type EquityChartPoint = EquityDatum & {
+  x: number;
+  y: number;
+};
+
+function buildEquityChartModel(
+  data: EquityDatum[],
+  w = 1000,
+  h = 118,
+  padX = 12,
+  padY = 14
+) {
+  if (!data.length) {
+    return {
+      w,
+      h,
+      padX,
+      padY,
+      points: [] as EquityChartPoint[],
+      linePoints: "",
+      areaPoints: "",
+      zeroY: h / 2,
+    };
+  }
+
+  const values = data.map((d) => d.cumulative);
+
+  // Always include zero in the scale.
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
   const span = max - min || 1;
 
-  return values
-    .map((v, i) => {
-      const x = pad + (i * (w - pad * 2)) / Math.max(1, values.length - 1);
-      const y = pad + ((max - v) * (h - pad * 2)) / span;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
+  const yFor = (value: number) =>
+    padY + ((max - value) * (h - padY * 2)) / span;
+
+  const points: EquityChartPoint[] = data.map((datum, index) => ({
+    ...datum,
+    x:
+      data.length === 1
+        ? w / 2
+        : padX +
+          (index * (w - padX * 2)) /
+            Math.max(1, data.length - 1),
+    y: yFor(datum.cumulative),
+  }));
+
+  const linePoints = points
+    .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
     .join(" ");
+
+  const areaBaseline = h - padY;
+
+  const areaPoints =
+    points.length > 1
+      ? `${points[0].x.toFixed(1)},${areaBaseline.toFixed(1)} ` +
+        `${linePoints} ` +
+        `${points[points.length - 1].x.toFixed(1)},${areaBaseline.toFixed(1)}`
+      : "";
+
+  return {
+    w,
+    h,
+    padX,
+    padY,
+    points,
+    linePoints,
+    areaPoints,
+    zeroY: yFor(0),
+  };
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -1283,19 +1345,67 @@ async function searchLocations(q: string) {
       if (dirtyLon && dayLon.trim() !== "" && lon === null) return toastErr("London amount must be a number.");
       if (dirtyNyc && dayNyc.trim() !== "" && nyc === null) return toastErr("NYC amount must be a number.");
 
-      const ops: Promise<void>[] = [];
-      if (dirtyTok) ops.push(upsertOrDelete(selectedISO, "tokyo", tok));
-      if (dirtyLon) ops.push(upsertOrDelete(selectedISO, "london", lon));
-      if (dirtyNyc) ops.push(upsertOrDelete(selectedISO, "nyc", nyc));
+      const savedDate = selectedISO;
 
-      if (ops.length === 0) return toastOk("No changes");
+const ops: Promise<void>[] = [];
+const changedSessions: Session[] = [];
 
-      await Promise.all(ops);
+if (dirtyTok) {
+  ops.push(upsertOrDelete(savedDate, "tokyo", tok));
+  changedSessions.push("tokyo");
+}
 
-      toastOk("Saved");
-      setStatus("Saved ✅");
+if (dirtyLon) {
+  ops.push(upsertOrDelete(savedDate, "london", lon));
+  changedSessions.push("london");
+}
 
-      await Promise.all([loadDayBreakdown(selectedISO), refreshAll()]);
+if (dirtyNyc) {
+  ops.push(upsertOrDelete(savedDate, "nyc", nyc));
+  changedSessions.push("nyc");
+}
+
+if (ops.length === 0) return toastOk("No changes");
+
+await Promise.all(ops);
+
+/*
+ * Check Discord eligibility for each changed session.
+ * This runs after the database save, but a Discord problem
+ * will never make the member's trade save appear to fail.
+ */
+void Promise.allSettled(
+  changedSessions.map(async (session) => {
+    const { data, error: publishError } =
+      await supabase.functions.invoke("post-member-win", {
+        body: {
+          date: savedDate,
+          session,
+        },
+      });
+
+    if (publishError) {
+      console.error(
+        `post-member-win failed for ${session}:`,
+        publishError
+      );
+      return;
+    }
+
+    console.info(
+      `post-member-win result for ${session}:`,
+      data
+    );
+  })
+);
+
+toastOk("Saved");
+setStatus("Saved ✅");
+
+await Promise.all([
+  loadDayBreakdown(savedDate),
+  refreshAll(),
+]);
     } catch (e: any) {
       console.error(e);
       const msg = e?.message ?? "Failed to save day edits.";
@@ -1401,46 +1511,96 @@ async function searchLocations(q: string) {
     };
   }, [dailyTotals, dayHasEntry, monthCursor]);
 
-  const monthEquitySeries = useMemo(() => {
-    const y = monthCursor.getFullYear();
-    const m = monthCursor.getMonth();
-    const start = new Date(y, m, 1);
-    const end = new Date(y, m + 1, 0);
+const monthEquityData = useMemo<EquityDatum[]>(() => {
+  const year = monthCursor.getFullYear();
+  const month = monthCursor.getMonth();
 
-    const values: number[] = [];
-    let cum = 0;
-    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-      const iso = toISODate(d);
-      const v = Number(dailyTotals.get(iso) ?? 0);
-      cum += v;
-      values.push(cum);
+  // Use only dates containing an actual submission.
+  // This prevents weekends, future dates, and empty days from
+  // stretching the chart into long flat sections.
+  const reportedDates = Array.from(dayHasEntry)
+    .filter((iso) => {
+      const d = new Date(`${iso}T00:00:00`);
+
+      return (
+        d.getFullYear() === year &&
+        d.getMonth() === month
+      );
+    })
+    .sort((a, b) => a.localeCompare(b));
+
+  let cumulative = 0;
+
+  return reportedDates.map((iso) => {
+    const daily = Number(dailyTotals.get(iso) ?? 0);
+    cumulative += daily;
+
+    return {
+      iso,
+      daily,
+      cumulative,
+    };
+  });
+}, [dailyTotals, dayHasEntry, monthCursor]);
+
+const equityChart = useMemo(
+  () => buildEquityChartModel(monthEquityData),
+  [monthEquityData]
+);
+
+const equityLastPoint =
+  equityChart.points.length > 0
+    ? equityChart.points[equityChart.points.length - 1]
+    : null;
+
+const equityHoverPoint = useMemo(() => {
+  if (!hoveredISO) return null;
+
+  return (
+    equityChart.points.find(
+      (point) => point.iso === hoveredISO
+    ) ?? null
+  );
+}, [equityChart.points, hoveredISO]);
+
+// This is the true cumulative result for the displayed month.
+// The old calculation accidentally subtracted the first day.
+const monthDelta = useMemo(() => {
+  if (!monthEquityData.length) return 0;
+
+  return monthEquityData[monthEquityData.length - 1].cumulative;
+}, [monthEquityData]);
+
+function updateEquityHover(
+  event: React.PointerEvent<SVGSVGElement>
+) {
+  if (!equityChart.points.length) return;
+
+  const rect = event.currentTarget.getBoundingClientRect();
+
+  const pointerX = clamp(
+    ((event.clientX - rect.left) / rect.width) *
+      equityChart.w,
+    equityChart.padX,
+    equityChart.w - equityChart.padX
+  );
+
+  let nearest = equityChart.points[0];
+  let nearestDistance = Math.abs(nearest.x - pointerX);
+
+  for (const point of equityChart.points) {
+    const distance = Math.abs(point.x - pointerX);
+
+    if (distance < nearestDistance) {
+      nearest = point;
+      nearestDistance = distance;
     }
-    return values;
-  }, [dailyTotals, monthCursor]);
+  }
 
-  const sparkPoints = useMemo(() => buildSparklinePoints(monthEquitySeries), [monthEquitySeries]);
-
-  const sparkAreaPoints = useMemo(() => {
-    if (!sparkPoints) return "";
-    const baselineY = 44 - 4;
-    const pts = sparkPoints.split(" ").filter(Boolean);
-    const firstX = pts[0]?.split(",")[0] ?? "4";
-    const lastX = pts[pts.length - 1]?.split(",")[0] ?? "236";
-    return `${firstX},${baselineY} ${sparkPoints} ${lastX},${baselineY}`;
-  }, [sparkPoints]);
-
-  const sparkLastPoint = useMemo(() => {
-    if (!sparkPoints) return null;
-    const pts = sparkPoints.split(" ").filter(Boolean);
-    const [x, y] = (pts[pts.length - 1] ?? "").split(",").map(Number);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-    return { x, y };
-  }, [sparkPoints]);
-
-  const monthDelta = useMemo(() => {
-    if (monthEquitySeries.length < 2) return 0;
-    return monthEquitySeries[monthEquitySeries.length - 1] - monthEquitySeries[0];
-  }, [monthEquitySeries]);
+  // Reusing hoveredISO automatically highlights the matching
+  // calendar cell below. Calendar hover also highlights the chart.
+  setHoveredISO(nearest.iso);
+}
 
   const calendarRangeDays = useMemo(() => {
     const start = new Date(calendarRange.startISO + "T00:00:00");
@@ -1659,82 +1819,363 @@ async function searchLocations(q: string) {
   </div>
 
   <div
+  style={{
+    border: `1px solid ${THEME.border}`,
+    borderRadius: 16,
+    padding: "12px 14px 10px",
+    background:
+      "linear-gradient(135deg, rgba(140,95,255,0.045), rgba(215,177,74,0.035))",
+    position: "relative",
+    overflow: "hidden",
+  }}
+>
+  {/* Equity header */}
+  <div
     style={{
-      border: `1px solid ${THEME.border}`,
-      borderRadius: 14,
-      padding: "10px 12px",
-      background: THEME.panel2,
-      display: "grid",
-      gridTemplateColumns: "90px 1fr",
-      alignItems: "center",
-      gap: 14,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
     }}
-    title="Month equity curve"
   >
+    <div>
+      <div
+        style={{
+          color: THEME.gold,
+          fontSize: 12,
+          fontWeight: 950,
+          letterSpacing: 0.2,
+        }}
+      >
+        Equity
+      </div>
+
+      <div
+        style={{
+          marginTop: 3,
+          fontSize: 11,
+          opacity: 0.56,
+        }}
+      >
+        Monthly cumulative P/L • drag to inspect
+      </div>
+    </div>
+
     <div
       style={{
-        fontSize: 12,
-        fontWeight: 900,
-        color: THEME.gold,
-        display: "flex",
-        gap: 10,
-        alignItems: "center",
+        color: monthDelta >= 0 ? THEME.green : THEME.red,
+        fontSize: 18,
+        fontWeight: 750,
         whiteSpace: "nowrap",
       }}
     >
-      Equity
-      <span
-        style={{
-          color: monthDelta >= 0 ? THEME.green : THEME.red,
-          fontWeight: 900,
-          opacity: 0.95,
-        }}
-      >
-        {monthDelta >= 0 ? "+" : ""}
-        {fmtMoneyCompact(monthDelta)}
-      </span>
+      {monthDelta >= 0 ? "+" : ""}
+      {fmtMoneyCompact(monthDelta)}
     </div>
+  </div>
 
-    <svg width="100%" height="56" viewBox="0 -5 240 56" preserveAspectRatio="none" style={{ display: "block" }}>
+  {/* Interactive equity chart */}
+  <div
+    style={{
+      position: "relative",
+      height: 126,
+      marginTop: 4,
+    }}
+  >
+    <svg
+      width="100%"
+      height="118"
+      viewBox={`0 0 ${equityChart.w} ${equityChart.h}`}
+      preserveAspectRatio="none"
+      style={{
+        display: "block",
+        width: "100%",
+        height: 118,
+        cursor: equityChart.points.length
+          ? "crosshair"
+          : "default",
+        touchAction: "pan-y",
+        overflow: "visible",
+      }}
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture?.(
+          event.pointerId
+        );
+
+        updateEquityHover(event);
+      }}
+      onPointerMove={updateEquityHover}
+      onPointerUp={(event) => {
+        if (
+          event.currentTarget.hasPointerCapture?.(
+            event.pointerId
+          )
+        ) {
+          event.currentTarget.releasePointerCapture?.(
+            event.pointerId
+          );
+        }
+      }}
+      onPointerLeave={() => setHoveredISO(null)}
+    >
       <defs>
-        <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={THEME.goldSoft} />
-          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        {/* Subtle area under the curve */}
+        <linearGradient
+          id="eqFillSharp"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop
+            offset="0%"
+            stopColor="rgba(215,177,74,0.20)"
+          />
+          <stop
+            offset="100%"
+            stopColor="rgba(0,0,0,0)"
+          />
         </linearGradient>
 
-        <linearGradient id="eqLine" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="rgba(140,95,255,0.95)" />
-          <stop offset="55%" stopColor="rgba(215,177,74,0.75)" />
-          <stop offset="100%" stopColor={THEME.gold} />
+        {/* Purple-to-gold laser gradient */}
+        <linearGradient
+          id="eqLaserLine"
+          x1="0"
+          y1="0"
+          x2="1"
+          y2="0"
+        >
+          <stop
+            offset="0%"
+            stopColor="rgba(140,95,255,1)"
+          />
+          <stop
+            offset="55%"
+            stopColor="rgba(215,177,74,0.88)"
+          />
+          <stop
+            offset="100%"
+            stopColor={THEME.gold}
+          />
         </linearGradient>
 
-        <filter id="eqGlow" x="-30%" y="-50%" width="160%" height="200%">
-          <feGaussianBlur stdDeviation="2.6" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
+        {/* Glow only sits behind the sharp line */}
+        <filter
+          id="eqLaserGlow"
+          x="-20%"
+          y="-50%"
+          width="140%"
+          height="200%"
+        >
+          <feGaussianBlur
+            stdDeviation="1.8"
+            result="blur"
+          />
         </filter>
       </defs>
 
-      {sparkAreaPoints && <polygon points={sparkAreaPoints} fill="url(#eqFill)" opacity="0.95" />}
-      <polyline
-        points={sparkPoints}
-        fill="none"
-        stroke="url(#eqLine)"
-        strokeWidth="2.4"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        filter="url(#eqGlow)"
+      {/* Zero reference line */}
+      <line
+        x1={equityChart.padX}
+        x2={equityChart.w - equityChart.padX}
+        y1={equityChart.zeroY}
+        y2={equityChart.zeroY}
+        stroke="rgba(255,255,255,0.075)"
+        strokeWidth="1"
+        vectorEffect="non-scaling-stroke"
       />
-      {sparkLastPoint && (
+
+      {/* Faint gradient area */}
+      {equityChart.areaPoints && (
+        <polygon
+          points={equityChart.areaPoints}
+          fill="url(#eqFillSharp)"
+          opacity="0.32"
+        />
+      )}
+
+      {/* Soft glow underlay */}
+      {equityChart.linePoints && (
+        <polyline
+          points={equityChart.linePoints}
+          fill="none"
+          stroke="url(#eqLaserLine)"
+          strokeWidth="5.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity="0.22"
+          filter="url(#eqLaserGlow)"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+
+      {/* Tight laser foreground line */}
+      {equityChart.linePoints && (
+        <polyline
+          points={equityChart.linePoints}
+          fill="none"
+          stroke="url(#eqLaserLine)"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+
+      {/* Latest reported point */}
+      {equityLastPoint && (
         <>
-          <circle cx={sparkLastPoint.x} cy={sparkLastPoint.y} r="4.5" fill={THEME.gold} />
-          <circle cx={sparkLastPoint.x} cy={sparkLastPoint.y} r="9.0" fill={THEME.goldSoft} />
+          <circle
+            cx={equityLastPoint.x}
+            cy={equityLastPoint.y}
+            r="7"
+            fill={THEME.goldSoft}
+            opacity="0.58"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <circle
+            cx={equityLastPoint.x}
+            cy={equityLastPoint.y}
+            r="2.8"
+            fill={THEME.gold}
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
+      )}
+
+      {/* Hover guide */}
+      {equityHoverPoint && (
+        <>
+          <line
+            x1={equityHoverPoint.x}
+            x2={equityHoverPoint.x}
+            y1={equityChart.padY}
+            y2={equityChart.h - equityChart.padY}
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth="1"
+            strokeDasharray="3 4"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <circle
+            cx={equityHoverPoint.x}
+            cy={equityHoverPoint.y}
+            r="6"
+            fill="rgba(8,8,10,0.95)"
+            stroke={THEME.gold}
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <circle
+            cx={equityHoverPoint.x}
+            cy={equityHoverPoint.y}
+            r="2.4"
+            fill={THEME.gold}
+            vectorEffect="non-scaling-stroke"
+          />
         </>
       )}
     </svg>
+
+    {/* HTML tooltip */}
+    {equityHoverPoint && (
+      <div
+        style={{
+          position: "absolute",
+          top: 5,
+          left: `${(
+            (equityHoverPoint.x / equityChart.w) *
+            100
+          ).toFixed(2)}%`,
+          transform:
+            equityHoverPoint.x <
+            equityChart.w * 0.2
+              ? "translateX(0)"
+              : equityHoverPoint.x >
+                equityChart.w * 0.8
+              ? "translateX(-100%)"
+              : "translateX(-50%)",
+          pointerEvents: "none",
+          minWidth: 180,
+          padding: "8px 10px",
+          borderRadius: 11,
+          border: `1px solid ${THEME.borderStrong}`,
+          background: "rgba(8,8,10,0.92)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 10px 26px rgba(0,0,0,0.42)",
+          zIndex: 3,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 950,
+            color: THEME.gold,
+          }}
+        >
+          {new Date(
+            `${equityHoverPoint.iso}T00:00:00`
+          ).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })}
+        </div>
+
+        <div
+          style={{
+            marginTop: 5,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            fontSize: 11,
+          }}
+        >
+          <span style={{ opacity: 0.68 }}>Day</span>
+
+          <span
+            style={{
+              color:
+                equityHoverPoint.daily >= 0
+                  ? THEME.green
+                  : THEME.red,
+              fontWeight: 950,
+            }}
+          >
+            {fmtMoney(equityHoverPoint.daily)}
+          </span>
+        </div>
+
+        <div
+          style={{
+            marginTop: 4,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            fontSize: 11,
+          }}
+        >
+          <span style={{ opacity: 0.68 }}>
+            Month total
+          </span>
+
+          <span
+            style={{
+              color:
+                equityHoverPoint.cumulative >= 0
+                  ? THEME.green
+                  : THEME.red,
+              fontWeight: 950,
+            }}
+          >
+            {fmtMoney(equityHoverPoint.cumulative)}
+          </span>
+        </div>
+      </div>
+    )}
   </div>
+</div>
 
   <div
     style={{
