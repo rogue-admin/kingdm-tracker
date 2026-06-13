@@ -318,9 +318,9 @@ function getSessionNoLossRunMaps(
 }
 
 function sessionMomentumLabel(s: Session) {
-  if (s === "tokyo") return "🇯🇵 Tokyo";
-  if (s === "london") return "🇬🇧 London";
-  return "🇺🇸 NYC";
+  if (s === "tokyo") return "Tokyo";
+  if (s === "london") return "London";
+  return "NYC";
 }
 
 function sessionMomentumColor(s: Session) {
@@ -1312,7 +1312,7 @@ const momentumItems = useMemo(() => {
   const minRunToShow = 2;
 
   const items: Array<{
-    key: string;
+    key: "overall" | Session;
     label: string;
     value: number;
     color: string;
@@ -1321,7 +1321,7 @@ const momentumItems = useMemo(() => {
   if (noLossRuns.overall >= minRunToShow) {
     items.push({
       key: "overall",
-      label: "🔥 Overall",
+      label: "Overall",
       value: noLossRuns.overall,
       color: THEME.gold,
     });
@@ -1333,7 +1333,7 @@ const momentumItems = useMemo(() => {
     if (value >= minRunToShow) {
       items.push({
         key: s,
-        label: `${sessionMomentumLabel(s)} 🔥`,
+        label: sessionMomentumLabel(s),
         value,
         color: sessionMomentumColor(s),
       });
@@ -1906,7 +1906,7 @@ async function openAllTimeSummary() {
     >
 
       {/* Top header */}
-<div style={{ display: "grid", gap: 10 }}>
+<div style={{ display: "grid", gap: 10, marginBottom: 12, }}>
   {/* Row 1: title + nav */}
   <div
     style={{
@@ -1990,14 +1990,39 @@ async function openAllTimeSummary() {
   >
     <span style={{ color: THEME.gold }}>Momentum:</span>
 
-    {momentumItems.map((item) => (
-      <span key={item.key} style={{ color: item.color }}>
-        {item.label}{" "}
-        <span style={{ color: THEME.gold }}>
-          {fmtInt(item.value)}
-        </span>
+{momentumItems.map((item) => {
+  const flagCountry =
+    item.key === "overall" ? null : sessionCountry(item.key);
+
+  return (
+    <span
+      key={item.key}
+      style={{
+        color: item.color,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {item.key === "overall" ? (
+        <span>🔥</span>
+      ) : flagCountry ? (
+        <FlagIcon country={flagCountry} size={16} />
+      ) : null}
+
+      <span>{item.label}</span>
+
+      <span style={{ color: THEME.gold }}>
+        {item.key === "overall" ? (
+          fmtInt(item.value)
+        ) : (
+          <>🔥 {fmtInt(item.value)}</>
+        )}
       </span>
-    ))}
+    </span>
+  );
+})}
   </span>
 )}
 
