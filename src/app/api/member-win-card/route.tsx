@@ -31,8 +31,12 @@ function sessionMeta(session: string) {
 }
 
 function formatMoney(value: number) {
-  const abs = Math.abs(value).toFixed(2);
-  return value >= 0 ? `+$${abs}` : `-$${abs}`;
+  const absolute = Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return value >= 0 ? `+$${absolute}` : `-$${absolute}`;
 }
 
 function getInitial(name: string) {
