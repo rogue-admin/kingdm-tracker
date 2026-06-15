@@ -142,6 +142,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [publishingSession, setPublishingSession] = useState(false);
   const [publishingDaily, setPublishingDaily] = useState(false);
+  const [publishingWeekly, setPublishingWeekly] = useState(false);
   const [loadedEntry, setLoadedEntry] = useState<OfficialSessionRow | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -485,6 +486,48 @@ function onNumberFieldKeyDown(
       setPublishingDaily(false);
     }
   }
+
+  async function publishWeeklySummaryToDiscord() {
+  setStatus(null);
+  setError(null);
+
+  if (!date) return setError("Date is required.");
+
+  const ok = window.confirm(
+    `Publish the Weekly Recap for the week containing ${date} to Discord?`
+  );
+
+  if (!ok) return;
+
+  setPublishingWeekly(true);
+
+  try {
+    const { data, error: discordError } =
+      await supabase.functions.invoke("post-weekly-summary", {
+        body: {
+          date,
+        },
+      });
+
+    if (discordError) {
+      setError(
+        `Weekly recap publish failed: ${discordError.message}`
+      );
+      return;
+    }
+
+    console.info("post-weekly-summary:", data);
+    setStatus("Published weekly recap to Discord ✅");
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Weekly recap publish failed."
+    );
+  } finally {
+    setPublishingWeekly(false);
+  }
+}
 
   async function remove(id: number) {
     const ok = window.confirm("Delete this row? This cannot be undone (for now).");
@@ -1169,6 +1212,31 @@ border: "1px solid rgba(215,177,74,0.18)",
 >
   {publishingDaily ? "Publishing..." : "Publish Daily Summary"}
 </button>
+
+<button
+  type="button"
+  onClick={publishWeeklySummaryToDiscord}
+  disabled={loading || publishingWeekly}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(170,110,255,0.28)",
+    background: publishingWeekly
+      ? "rgba(255,255,255,0.06)"
+      : "linear-gradient(135deg, rgba(170,110,255,0.20), rgba(215,177,74,0.08))",
+    color: "white",
+    cursor:
+      loading || publishingWeekly
+        ? "not-allowed"
+        : "pointer",
+    fontWeight: 900,
+  }}
+>
+  {publishingWeekly
+    ? "Publishing..."
+    : "Publish Weekly Recap"}
+</button>
+
 
   {editingId !== null && (
     <button
