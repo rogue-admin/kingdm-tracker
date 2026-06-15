@@ -143,6 +143,7 @@ export default function AdminPage() {
   const [publishingSession, setPublishingSession] = useState(false);
   const [publishingDaily, setPublishingDaily] = useState(false);
   const [publishingWeekly, setPublishingWeekly] = useState(false);
+  const [publishingMonthly, setPublishingMonthly] = useState(false);
   const [loadedEntry, setLoadedEntry] = useState<OfficialSessionRow | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -526,6 +527,64 @@ function onNumberFieldKeyDown(
     );
   } finally {
     setPublishingWeekly(false);
+  }
+}
+
+async function publishMonthlySummaryToDiscord() {
+  setStatus(null);
+  setError(null);
+
+  if (!date) {
+    setError("Date is required.");
+    return;
+  }
+
+  const selectedMonth = new Date(
+    `${date}T00:00:00`
+  ).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const ok = window.confirm(
+    `Publish the Monthly Recap for ${selectedMonth} to Discord?`
+  );
+
+  if (!ok) return;
+
+  setPublishingMonthly(true);
+
+  try {
+    const { data, error: discordError } =
+      await supabase.functions.invoke(
+        "post-monthly-summary",
+        {
+          body: {
+            date,
+          },
+        }
+      );
+
+    if (discordError) {
+      setError(
+        `Monthly recap publish failed: ${discordError.message}`
+      );
+      return;
+    }
+
+    console.info("post-monthly-summary:", data);
+
+    setStatus(
+      "Published monthly recap to Discord ✅"
+    );
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Monthly recap publish failed."
+    );
+  } finally {
+    setPublishingMonthly(false);
   }
 }
 
@@ -1305,19 +1364,27 @@ border: "1px solid rgba(215,177,74,0.18)",
 
       <button
         type="button"
-        disabled
-        title="Monthly Summary will be added next."
+        onClick={publishMonthlySummaryToDiscord}
+        disabled={loading || publishingMonthly}
         style={{
           padding: "10px 14px",
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.09)",
-          background: "rgba(255,255,255,0.025)",
-          color: "rgba(255,255,255,0.34)",
-          cursor: "not-allowed",
+          border:
+            "1px solid rgba(215,177,74,0.28)",
+          background: publishingMonthly
+            ? "rgba(255,255,255,0.06)"
+            : "linear-gradient(135deg, rgba(215,177,74,0.14), rgba(140,95,255,0.08))",
+          color: "white",
+          cursor:
+          loading || publishingMonthly
+            ? "not-allowed"
+            : "pointer",
           fontWeight: 700,
         }}
       >
-        Monthly Summary
+        {publishingMonthly
+          ? "Publishing..."
+          : "Monthly Summary"}
       </button>
     </div>
   </div>
