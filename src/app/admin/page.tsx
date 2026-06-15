@@ -1241,7 +1241,7 @@ border: "1px solid rgba(215,177,74,0.18)",
       style={{
         color: THEME.gold,
         fontSize: 13,
-        fontWeight: 950,
+        fontWeight: 750,
         letterSpacing: 0.35,
       }}
     >
@@ -1271,7 +1271,7 @@ border: "1px solid rgba(215,177,74,0.18)",
             loading || publishingDaily
               ? "not-allowed"
               : "pointer",
-          fontWeight: 900,
+          fontWeight: 700,
         }}
       >
         {publishingDaily
@@ -1295,7 +1295,7 @@ border: "1px solid rgba(215,177,74,0.18)",
             loading || publishingWeekly
               ? "not-allowed"
               : "pointer",
-          fontWeight: 900,
+          fontWeight: 700,
         }}
       >
         {publishingWeekly
@@ -1314,7 +1314,7 @@ border: "1px solid rgba(215,177,74,0.18)",
           background: "rgba(255,255,255,0.025)",
           color: "rgba(255,255,255,0.34)",
           cursor: "not-allowed",
-          fontWeight: 900,
+          fontWeight: 700,
         }}
       >
         Monthly Summary
