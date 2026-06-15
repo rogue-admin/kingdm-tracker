@@ -1132,147 +1132,212 @@ border: "1px solid rgba(215,177,74,0.18)",
 
   <div
   style={{
+    marginTop: 18,
     display: "flex",
-    gap: 10,
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginTop: 16,
+    flexDirection: "column",
+    gap: 16,
   }}
 >
-  <button
-  onClick={save}
-  disabled={loading}
-  style={{
-    padding: "10px 16px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: loading
-      ? "rgba(255,255,255,0.06)"
-      : "linear-gradient(135deg, rgba(215,177,74,0.22), rgba(255,255,255,0.08))",
-    color: "white",
-    cursor: loading ? "not-allowed" : "pointer",
-    fontWeight: 900,
-    boxShadow: loading ? "none" : "0 0 18px rgba(215,177,74,0.10)",
-    transition: "transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, filter 140ms ease",
-  }}
-  onMouseEnter={(e) => {
-    if (loading) return;
-    e.currentTarget.style.transform = "translateY(-1px)";
-    e.currentTarget.style.boxShadow = "0 10px 24px rgba(0,0,0,0.28), 0 0 18px rgba(215,177,74,0.18)";
-    e.currentTarget.style.borderColor = "rgba(215,177,74,0.28)";
-    e.currentTarget.style.filter = "brightness(1.06)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = loading ? "none" : "0 0 18px rgba(215,177,74,0.10)";
-    e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
-    e.currentTarget.style.filter = "brightness(1)";
-  }}
->
-  {loading ? "Saving..." : editingId === null ? "Add Session" : "Save Changes"}
-</button>
-
-<button
-  type="button"
-  onClick={publishSessionToDiscord}
-  disabled={loading || publishingSession || winsN === null || lossesN === null || breakevensN === null}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(85,255,138,0.22)",
-    background: publishingSession
-      ? "rgba(255,255,255,0.06)"
-      : "linear-gradient(135deg, rgba(85,255,138,0.16), rgba(255,255,255,0.05))",
-    color: "white",
-    cursor:
-      loading || publishingSession || winsN === null || lossesN === null || breakevensN === null
-        ? "not-allowed"
-        : "pointer",
-    fontWeight: 900,
-  }}
->
-  {publishingSession ? "Publishing..." : "Publish Session to Discord"}
-</button>
-
-<button
-  type="button"
-  onClick={publishDailySummaryToDiscord}
-  disabled={loading || publishingDaily}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(215,177,74,0.24)",
-    background: publishingDaily
-      ? "rgba(255,255,255,0.06)"
-      : "linear-gradient(135deg, rgba(215,177,74,0.18), rgba(255,255,255,0.05))",
-    color: "white",
-    cursor: loading || publishingDaily ? "not-allowed" : "pointer",
-    fontWeight: 900,
-  }}
->
-  {publishingDaily ? "Publishing..." : "Publish Daily Summary"}
-</button>
-
-<button
-  type="button"
-  onClick={publishWeeklySummaryToDiscord}
-  disabled={loading || publishingWeekly}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(170,110,255,0.28)",
-    background: publishingWeekly
-      ? "rgba(255,255,255,0.06)"
-      : "linear-gradient(135deg, rgba(170,110,255,0.20), rgba(215,177,74,0.08))",
-    color: "white",
-    cursor:
-      loading || publishingWeekly
-        ? "not-allowed"
-        : "pointer",
-    fontWeight: 900,
-  }}
->
-  {publishingWeekly
-    ? "Publishing..."
-    : "Publish Weekly Recap"}
-</button>
-
-
-  {editingId !== null && (
+  {/* Primary actions for the selected session */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+    }}
+  >
     <button
       type="button"
-      onClick={resetForm}
+      onClick={save}
       disabled={loading}
       style={{
-        padding: "10px 14px",
+        padding: "11px 16px",
         borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.10)",
-        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(215,177,74,0.28)",
+        background: loading
+          ? "rgba(255,255,255,0.06)"
+          : "linear-gradient(135deg, rgba(215,177,74,0.22), rgba(255,255,255,0.08))",
         color: "white",
         cursor: loading ? "not-allowed" : "pointer",
         fontWeight: 900,
+        boxShadow: loading
+          ? "none"
+          : "0 0 18px rgba(215,177,74,0.10)",
       }}
     >
-      Cancel
+      {loading
+        ? "Saving..."
+        : editingId === null
+        ? "Add Session"
+        : "Save Changes"}
     </button>
-  )}
 
-{error && (
-  <span
+    <button
+      type="button"
+      onClick={publishSessionToDiscord}
+      disabled={
+        loading ||
+        publishingSession ||
+        winsN === null ||
+        lossesN === null ||
+        breakevensN === null
+      }
+      style={{
+        padding: "11px 16px",
+        borderRadius: 12,
+        border: "1px solid rgba(85,255,138,0.26)",
+        background: publishingSession
+          ? "rgba(255,255,255,0.06)"
+          : "linear-gradient(135deg, rgba(85,255,138,0.17), rgba(255,255,255,0.05))",
+        color: "white",
+        cursor:
+          loading ||
+          publishingSession ||
+          winsN === null ||
+          lossesN === null ||
+          breakevensN === null
+            ? "not-allowed"
+            : "pointer",
+        fontWeight: 900,
+      }}
+    >
+      {publishingSession
+        ? "Publishing..."
+        : "Publish to Discord"}
+    </button>
+
+    {editingId !== null && (
+      <button
+        type="button"
+        onClick={resetForm}
+        disabled={loading}
+        style={{
+          padding: "10px 13px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "rgba(255,255,255,0.035)",
+          color: "rgba(255,255,255,0.72)",
+          cursor: loading ? "not-allowed" : "pointer",
+          fontWeight: 800,
+        }}
+      >
+        Cancel Editing
+      </button>
+    )}
+  </div>
+
+  {/* Summary publishing group */}
+  <div
     style={{
-      color: "#ff8a8a",
-      fontWeight: 900,
-      padding: "8px 12px",
-      borderRadius: 999,
-      background: "rgba(255,92,92,0.10)",
-      border: "1px solid rgba(255,92,92,0.20)",
-      boxShadow: "0 0 16px rgba(255,92,92,0.08)",
+      paddingTop: 15,
+      borderTop: "1px solid rgba(255,255,255,0.09)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
     }}
   >
-    {error}
-  </span>
-)}
+    <div
+      style={{
+        color: THEME.gold,
+        fontSize: 13,
+        fontWeight: 950,
+        letterSpacing: 0.35,
+      }}
+    >
+      Publish Summaries to Discord
+    </div>
 
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        flexWrap: "wrap",
+      }}
+    >
+      <button
+        type="button"
+        onClick={publishDailySummaryToDiscord}
+        disabled={loading || publishingDaily}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 12,
+          border: "1px solid rgba(215,177,74,0.25)",
+          background: publishingDaily
+            ? "rgba(255,255,255,0.06)"
+            : "rgba(215,177,74,0.09)",
+          color: "white",
+          cursor:
+            loading || publishingDaily
+              ? "not-allowed"
+              : "pointer",
+          fontWeight: 900,
+        }}
+      >
+        {publishingDaily
+          ? "Publishing..."
+          : "Daily Summary"}
+      </button>
+
+      <button
+        type="button"
+        onClick={publishWeeklySummaryToDiscord}
+        disabled={loading || publishingWeekly}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 12,
+          border: "1px solid rgba(170,110,255,0.28)",
+          background: publishingWeekly
+            ? "rgba(255,255,255,0.06)"
+            : "rgba(170,110,255,0.11)",
+          color: "white",
+          cursor:
+            loading || publishingWeekly
+              ? "not-allowed"
+              : "pointer",
+          fontWeight: 900,
+        }}
+      >
+        {publishingWeekly
+          ? "Publishing..."
+          : "Weekly Summary"}
+      </button>
+
+      <button
+        type="button"
+        disabled
+        title="Monthly Summary will be added next."
+        style={{
+          padding: "10px 14px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.09)",
+          background: "rgba(255,255,255,0.025)",
+          color: "rgba(255,255,255,0.34)",
+          cursor: "not-allowed",
+          fontWeight: 900,
+        }}
+      >
+        Monthly Summary
+      </button>
+    </div>
+  </div>
+
+  {error && (
+    <div
+      style={{
+        alignSelf: "flex-start",
+        color: "#ff8a8a",
+        fontWeight: 900,
+        padding: "8px 12px",
+        borderRadius: 999,
+        background: "rgba(255,92,92,0.10)",
+        border: "1px solid rgba(255,92,92,0.20)",
+        boxShadow: "0 0 16px rgba(255,92,92,0.08)",
+      }}
+    >
+      {error}
+    </div>
+  )}
 </div>
 
   <div style={{ fontSize: 12, opacity: 0.72 }}>

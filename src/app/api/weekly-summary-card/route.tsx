@@ -373,8 +373,8 @@ export async function GET(req: Request) {
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="96"
-              height="96"
+              width="116"
+              height="116"
               style={{
                 display: "flex",
               }}
