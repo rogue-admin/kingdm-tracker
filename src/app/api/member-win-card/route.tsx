@@ -5,9 +5,9 @@ export const runtime = "edge";
 const BASE_URL = "https://kingdm-tracker.vercel.app";
 
 function sessionMeta(session: string) {
-  const s = session.toLowerCase();
+  const normalized = session.toLowerCase();
 
-  if (s === "tokyo") {
+  if (normalized === "tokyo") {
     return {
       label: "Tokyo Session",
       flag: "🇯🇵",
@@ -15,7 +15,7 @@ function sessionMeta(session: string) {
     };
   }
 
-  if (s === "london") {
+  if (normalized === "london") {
     return {
       label: "London Session",
       flag: "🇬🇧",
@@ -46,12 +46,24 @@ function getInitial(name: string) {
 export async function GET(req: Request) {
   const url = new URL(req.url);
 
-  const member = url.searchParams.get("member") ?? "Kingdm Trader";
-  const tier = url.searchParams.get("tier") ?? "Knight";
-  const session = url.searchParams.get("session") ?? "nyc";
-  const amount = Number(url.searchParams.get("amount") ?? 0);
-  const date = url.searchParams.get("date") ?? "";
-  const avatarUrl = url.searchParams.get("avatarUrl") ?? "";
+  const member =
+    url.searchParams.get("member") ?? "Kingdm Trader";
+
+  const tier =
+    url.searchParams.get("tier") ?? "Knight";
+
+  const session =
+    url.searchParams.get("session") ?? "nyc";
+
+  const amount = Number(
+    url.searchParams.get("amount") ?? 0
+  );
+
+  const date =
+    url.searchParams.get("date") ?? "";
+
+  const avatarUrl =
+    url.searchParams.get("avatarUrl") ?? "";
 
   const meta = sessionMeta(session);
   const money = formatMoney(amount);
@@ -61,14 +73,15 @@ export async function GET(req: Request) {
       <div
         style={{
           width: "1200px",
-          height: "500px",
+          height: "460px",
           backgroundColor: "rgb(9,9,11)",
           backgroundImage:
             "radial-gradient(circle at 16% 14%, rgba(140,95,255,0.30), rgba(0,0,0,0) 34%), radial-gradient(circle at 86% 12%, rgba(215,177,74,0.24), rgba(0,0,0,0) 36%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "34px 44px 24px",
+          justifyContent: "center",
+          padding: "26px 44px",
           fontFamily: "Arial",
         }}
       >
@@ -91,7 +104,9 @@ export async function GET(req: Request) {
               src={`${BASE_URL}/Kingdm-logo.png`}
               width="92"
               height="92"
-              style={{ display: "flex" }}
+              style={{
+                display: "flex",
+              }}
             />
 
             <div
@@ -138,10 +153,10 @@ export async function GET(req: Request) {
           </div>
         </div>
 
-        {/* Main Card */}
+        {/* Main result panel */}
         <div
           style={{
-            marginTop: 24,
+            marginTop: 22,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -149,10 +164,9 @@ export async function GET(req: Request) {
             border: `2px solid ${meta.accent}`,
             backgroundColor: "rgba(255,255,255,0.03)",
             padding: "22px 28px",
-            flex: 1,
           }}
         >
-          {/* Left side */}
+          {/* Member */}
           <div
             style={{
               display: "flex",
@@ -213,8 +227,10 @@ export async function GET(req: Request) {
                     alignSelf: "flex-start",
                     padding: "6px 12px",
                     borderRadius: 999,
-                    border: "1px solid rgba(215,177,74,0.32)",
-                    backgroundColor: "rgba(215,177,74,0.08)",
+                    border:
+                      "1px solid rgba(215,177,74,0.32)",
+                    backgroundColor:
+                      "rgba(215,177,74,0.08)",
                     color: "#D7B14A",
                     fontSize: 18,
                     fontWeight: 600,
@@ -243,11 +259,12 @@ export async function GET(req: Request) {
               display: "flex",
               width: 1,
               height: 88,
-              backgroundColor: "rgba(255,255,255,0.16)",
+              backgroundColor:
+                "rgba(255,255,255,0.16)",
             }}
           />
 
-          {/* Right side */}
+          {/* Session result */}
           <div
             style={{
               display: "flex",
@@ -274,7 +291,10 @@ export async function GET(req: Request) {
                 display: "flex",
                 fontSize: 58,
                 fontWeight: 900,
-                color: amount >= 0 ? "#55FF8A" : "#ff5c5c",
+                color:
+                  amount >= 0
+                    ? "#55FF8A"
+                    : "#ff5c5c",
                 lineHeight: 1,
               }}
             >
@@ -286,7 +306,8 @@ export async function GET(req: Request) {
     ),
     {
       width: 1200,
-      height: 500,
+      height: 460,
     }
   );
 }
+
