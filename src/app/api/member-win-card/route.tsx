@@ -60,17 +60,16 @@ export async function GET(req: Request) {
     (
       <div
         style={{
-          width: "1100px",
-          height: "520px",
+          width: "1200px",
+          height: "500px",
           backgroundColor: "rgb(9,9,11)",
           backgroundImage:
             "radial-gradient(circle at 16% 14%, rgba(140,95,255,0.30), rgba(0,0,0,0) 34%), radial-gradient(circle at 86% 12%, rgba(215,177,74,0.24), rgba(0,0,0,0) 36%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "34px 48px",
+          padding: "34px 44px 24px",
           fontFamily: "Arial",
-          justifyContent: "center",
         }}
       >
         {/* Header */}
@@ -85,13 +84,13 @@ export async function GET(req: Request) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 22,
+              gap: 18,
             }}
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="112"
-              height="112"
+              width="92"
+              height="92"
               style={{ display: "flex" }}
             />
 
@@ -105,7 +104,7 @@ export async function GET(req: Request) {
                 style={{
                   display: "flex",
                   color: "#D7B14A",
-                  fontSize: 38,
+                  fontSize: 34,
                   fontWeight: 900,
                   lineHeight: 1,
                 }}
@@ -116,8 +115,8 @@ export async function GET(req: Request) {
               <div
                 style={{
                   display: "flex",
-                  marginTop: 10,
-                  fontSize: 60,
+                  marginTop: 6,
+                  fontSize: 56,
                   fontWeight: 900,
                   lineHeight: 1,
                 }}
@@ -130,9 +129,9 @@ export async function GET(req: Request) {
           <div
             style={{
               display: "flex",
-              fontSize: 28,
+              fontSize: 24,
               opacity: 0.75,
-              paddingTop: 8,
+              paddingTop: 4,
             }}
           >
             {date}
@@ -142,15 +141,15 @@ export async function GET(req: Request) {
         {/* Main Card */}
         <div
           style={{
-            marginTop: 28,
+            marginTop: 24,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderRadius: 30,
+            borderRadius: 28,
             border: `2px solid ${meta.accent}`,
             backgroundColor: "rgba(255,255,255,0.03)",
-            padding: "34px 36px",
-            minHeight: 210,
+            padding: "22px 28px",
+            flex: 1,
           }}
         >
           {/* Left side */}
@@ -165,15 +164,15 @@ export async function GET(req: Request) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 22,
+                gap: 18,
                 width: "100%",
               }}
             >
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
-                  width="96"
-                  height="96"
+                  width="90"
+                  height="90"
                   style={{
                     display: "flex",
                     borderRadius: "999px",
@@ -186,13 +185,13 @@ export async function GET(req: Request) {
                 <div
                   style={{
                     display: "flex",
-                    width: 96,
-                    height: 96,
+                    width: 90,
+                    height: 90,
                     borderRadius: 999,
                     border: `2px solid ${meta.accent}`,
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 38,
+                    fontSize: 36,
                     fontWeight: 900,
                     backgroundColor: "#111827",
                   }}
@@ -205,11 +204,11 @@ export async function GET(req: Request) {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 14,
+                  gap: 10,
                 }}
               >
-            <div
-                style={{
+                <div
+                  style={{
                     display: "flex",
                     alignSelf: "flex-start",
                     padding: "6px 12px",
@@ -219,16 +218,16 @@ export async function GET(req: Request) {
                     color: "#D7B14A",
                     fontSize: 18,
                     fontWeight: 600,
-                    }}
-               >
-                   {tier}
-               </div>
+                  }}
+                >
+                  {tier}
+                </div>
 
                 <div
                   style={{
                     display: "flex",
-                    fontSize: 42,
-                    fontWeight: 950,
+                    fontSize: 40,
+                    fontWeight: 900,
                     lineHeight: 1.05,
                   }}
                 >
@@ -243,7 +242,7 @@ export async function GET(req: Request) {
             style={{
               display: "flex",
               width: 1,
-              height: 120,
+              height: 88,
               backgroundColor: "rgba(255,255,255,0.16)",
             }}
           />
@@ -256,14 +255,14 @@ export async function GET(req: Request) {
               alignItems: "flex-end",
               justifyContent: "center",
               width: "38%",
-              gap: 12,
+              gap: 8,
             }}
           >
             <div
               style={{
                 display: "flex",
                 color: meta.accent,
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: 700,
               }}
             >
@@ -273,7 +272,7 @@ export async function GET(req: Request) {
             <div
               style={{
                 display: "flex",
-                fontSize: 64,
+                fontSize: 58,
                 fontWeight: 900,
                 color: amount >= 0 ? "#55FF8A" : "#ff5c5c",
                 lineHeight: 1,
@@ -286,8 +285,8 @@ export async function GET(req: Request) {
       </div>
     ),
     {
-      width: 1100,
-      height: 520,
+      width: 1200,
+      height: 500,
     }
   );
 }
