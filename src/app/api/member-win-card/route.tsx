@@ -60,15 +60,15 @@ export async function GET(req: Request) {
     (
       <div
         style={{
-          width: "1200px",
-          height: "460px",
+          width: "1100px",
+          height: "520px",
           backgroundColor: "rgb(9,9,11)",
           backgroundImage:
             "radial-gradient(circle at 16% 14%, rgba(140,95,255,0.30), rgba(0,0,0,0) 34%), radial-gradient(circle at 86% 12%, rgba(215,177,74,0.24), rgba(0,0,0,0) 36%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "28px 58px",
+          padding: "34px 48px",
           fontFamily: "Arial",
           justifyContent: "center",
         }}
@@ -142,7 +142,7 @@ export async function GET(req: Request) {
         {/* Main Card */}
         <div
           style={{
-            marginTop: 24,
+            marginTop: 28,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -286,8 +286,8 @@ export async function GET(req: Request) {
       </div>
     ),
     {
-      width: 1200,
-      height: 460,
+      width: 1100,
+      height: 520,
     }
   );
 }
