@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import TopNav from "@/app/components/TopNav";
 
 type Session = "tokyo" | "london" | "nyc";
-type TF = "week" | "month" | "year" | "all";
+
+type SummaryCardKind = "weekly" | "monthly" | null;
 
 type DailyOverallRow = {
   date: string;
@@ -51,6 +52,116 @@ function toISODate(d: Date) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function nthWeekdayOfMonth(
+  year: number,
+  month0: number,
+  weekday: number,
+  nth: number
+) {
+  const first = new Date(year, month0, 1);
+  const firstDow = first.getDay();
+  const offset = (weekday - firstDow + 7) % 7;
+  const day = 1 + offset + (nth - 1) * 7;
+
+  return new Date(year, month0, day);
+}
+
+function lastWeekdayOfMonth(
+  year: number,
+  month0: number,
+  weekday: number
+) {
+  const last = new Date(year, month0 + 1, 0);
+  const lastDow = last.getDay();
+  const offset = (lastDow - weekday + 7) % 7;
+
+  return new Date(
+    year,
+    month0,
+    last.getDate() - offset
+  );
+}
+
+function usFederalHolidayMap(year: number) {
+  const dates = new Map<string, string>();
+
+  const addObservedHoliday = (
+    holiday: Date,
+    name: string
+  ) => {
+    const observed = new Date(holiday);
+
+    // Saturday holidays are observed Friday.
+    if (observed.getDay() === 6) {
+      observed.setDate(observed.getDate() - 1);
+    }
+
+    // Sunday holidays are observed Monday.
+    if (observed.getDay() === 0) {
+      observed.setDate(observed.getDate() + 1);
+    }
+
+    dates.set(toISODate(observed), name);
+  };
+
+  addObservedHoliday(
+    new Date(year, 0, 1),
+    "New Year's Day"
+  );
+
+  addObservedHoliday(
+    nthWeekdayOfMonth(year, 0, 1, 3),
+    "Martin Luther King Jr. Day"
+  );
+
+  addObservedHoliday(
+    nthWeekdayOfMonth(year, 1, 1, 3),
+    "Presidents Day"
+  );
+
+  addObservedHoliday(
+    lastWeekdayOfMonth(year, 4, 1),
+    "Memorial Day"
+  );
+
+  addObservedHoliday(
+    new Date(year, 5, 19),
+    "Juneteenth"
+  );
+
+  addObservedHoliday(
+    new Date(year, 6, 4),
+    "Independence Day"
+  );
+
+  addObservedHoliday(
+    nthWeekdayOfMonth(year, 8, 1, 1),
+    "Labor Day"
+  );
+
+  addObservedHoliday(
+    nthWeekdayOfMonth(year, 9, 1, 2),
+    "Columbus Day"
+  );
+
+  addObservedHoliday(
+    new Date(year, 10, 11),
+    "Veterans Day"
+  );
+
+  addObservedHoliday(
+    nthWeekdayOfMonth(year, 10, 4, 4),
+    "Thanksgiving"
+  );
+
+  addObservedHoliday(
+    new Date(year, 11, 25),
+    "Christmas Day"
+  );
+
+  return dates;
 }
 
 function addDays(d: Date, days: number) {
@@ -1008,7 +1119,9 @@ const [summaryBySession, setSummaryBySession] = useState<
   Record<Session, { wins: number; losses: number; breakevens: number }> | null
 >(null);
 
-const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryCardUrl, setSummaryCardUrl] =
+    useState<string | null>(null);
 
   const [tf, setTf] = useState<TF>("month");
   const [chartOverall, setChartOverall] = useState<DailyOverallRow[]>([]);
@@ -1116,63 +1229,139 @@ useEffect(() => {
     lastKeyRef.current = key;
   }, [zoomStatus]);
 
-  function openRangeSummary(title: string, startISO: string, endISO: string) {
-    let wO = 0;
-    let lO = 0;
-    let beO = 0;
+  function openRangeSummary(
+  title: string,
+  startISO: string,
+  endISO: string,
+  cardKind: SummaryCardKind = null
+) {
+  let wO = 0;
+  let lO = 0;
+  let beO = 0;
 
-    const sessTotals: Record<
-      Session,
-      { wins: number; losses: number; breakevens: number }
-    > = {
-      tokyo: { wins: 0, losses: 0, breakevens: 0 },
-      london: { wins: 0, losses: 0, breakevens: 0 },
-      nyc: { wins: 0, losses: 0, breakevens: 0 },
-    };
+  const sessTotals: Record<
+    Session,
+    {
+      wins: number;
+      losses: number;
+      breakevens: number;
+    }
+  > = {
+    tokyo: {
+      wins: 0,
+      losses: 0,
+      breakevens: 0,
+    },
+    london: {
+      wins: 0,
+      losses: 0,
+      breakevens: 0,
+    },
+    nyc: {
+      wins: 0,
+      losses: 0,
+      breakevens: 0,
+    },
+  };
 
-    const start = new Date(startISO + "T00:00:00");
-    const end = new Date(endISO + "T00:00:00");
+  const start = new Date(
+    `${startISO}T00:00:00`
+  );
 
-    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-      if (isWeekendDate(d)) continue;
+  const end = new Date(
+    `${endISO}T00:00:00`
+  );
 
-      const iso = toISODate(d);
+  for (
+    let day = new Date(start);
+    day <= end;
+    day = addDays(day, 1)
+  ) {
+    if (isWeekendDate(day)) continue;
 
-      const o = calendarMap.get(iso);
-      if (o) {
-        wO += safeNum(o.wins);
-        lO += safeNum(o.losses);
-        beO += safeNum(o.breakevens);
-      }
+    const iso = toISODate(day);
 
-      const per = sessionMap.get(iso);
-      if (per) {
-        (["tokyo", "london", "nyc"] as Session[]).forEach((s) => {
-          const r = per.get(s);
-          if (!r) return;
+    const overall = calendarMap.get(iso);
 
-          sessTotals[s].wins += safeNum(r.wins);
-          sessTotals[s].losses += safeNum(r.losses);
-          sessTotals[s].breakevens += safeNum(r.breakevens);
-        });
-      }
+    if (overall) {
+      wO += safeNum(overall.wins);
+      lO += safeNum(overall.losses);
+      beO += safeNum(overall.breakevens);
     }
 
-    setSummaryTitle(title);
-    setSummaryOverall({
-      wins: wO,
-      losses: lO,
-      breakevens: beO,
-    });
-    setSummaryBySession(sessTotals);
-    setSummaryOpen(true);
+    const sessions = sessionMap.get(iso);
+
+    if (sessions) {
+      (
+        ["tokyo", "london", "nyc"] as Session[]
+      ).forEach((session) => {
+        const row = sessions.get(session);
+
+        if (!row) return;
+
+        sessTotals[session].wins += safeNum(
+          row.wins
+        );
+
+        sessTotals[session].losses += safeNum(
+          row.losses
+        );
+
+        sessTotals[
+          session
+        ].breakevens += safeNum(
+          row.breakevens
+        );
+      });
+    }
   }
+
+  let cardUrl: string | null = null;
+
+  if (cardKind === "weekly") {
+    /*
+     * endISO works whether the visible calendar
+     * week ends Friday or Saturday. The API route
+     * determines the correct Monday-based week.
+     */
+    const params = new URLSearchParams({
+      date: endISO,
+    });
+
+    cardUrl =
+      `/api/weekly-summary-card?` +
+      params.toString();
+  }
+
+  if (cardKind === "monthly") {
+    const params = new URLSearchParams({
+      date: startISO,
+    });
+
+    cardUrl =
+      `/api/monthly-summary-card?` +
+      params.toString();
+  }
+
+  setSummaryTitle(title);
+
+  setSummaryOverall({
+    wins: wO,
+    losses: lO,
+    breakevens: beO,
+  });
+
+  setSummaryBySession(sessTotals);
+  setSummaryCardUrl(cardUrl);
+  setSummaryOpen(true);
+}
 
   async function openFetchedRangeSummary(
   title: string,
   startISO: string,
   endISO: string
 ) {
+  setSummaryCardUrl(null);
   setSummaryLoading(true);
   setSummaryTitle(title);
   setSummaryOverall(null);
@@ -1272,6 +1461,24 @@ useEffect(() => {
       rows.push(calendarDays.slice(i, i + 7));
     }
     return rows;
+  }, [calendarDays]);
+
+  const holidayMap = useMemo(() => {
+    const visibleYears = new Set(
+      calendarDays.map((day) => day.getFullYear())
+    );
+
+    const combined = new Map<string, string>();
+
+    visibleYears.forEach((year) => {
+      usFederalHolidayMap(year).forEach(
+        (name, iso) => {
+          combined.set(iso, name);
+        }
+      );
+    });
+
+    return combined;
   }, [calendarDays]);
 
   const mtd = useMemo(() => {
@@ -1789,10 +1996,11 @@ const chartEnhancements = useMemo(() => {
   }, [chartSeries, chartEnhancements]);
 
   function openDay(iso: string) {
-    if (isWeekendISO(iso)) return;
-    setSelectedISO(iso);
-    setModalOpen(true);
-  }
+  if (isWeekendISO(iso)) return;
+
+  setSelectedISO(iso);
+  setModalOpen(true);
+}
 
   function closeModal() {
     setModalOpen(false);
@@ -1828,29 +2036,50 @@ const chartEnhancements = useMemo(() => {
 
     openRangeSummary(
       `Month Summary (${monthLabel(monthCursor)})`,
-      startISO,
-      endISO
+        startISO,
+        endISO,
+      "monthly"
     );
   }
 
+  function openGeneratedSummary(
+    title: string,
+    route: string,
+    date: string
+  ) {
+    const params = new URLSearchParams({
+      date,
+    });
+
+    setSummaryTitle(title);
+    setSummaryOverall(null);
+    setSummaryBySession(null);
+    setSummaryLoading(false);
+    setSummaryCardUrl(`${route}?${params.toString()}`);
+    setSummaryOpen(true);
+  }
+
   async function openYearSummaryYTD() {
-  const now = new Date();
-  const year = now.getFullYear();
+    const now = new Date();
+    const year = now.getFullYear();
+    const date = toISODate(now);
 
-  await openFetchedRangeSummary(
-    `Year Summary (${year} YTD)`,
-    `${year}-01-01`,
-    toISODate(now)
-  );
-}
+    openGeneratedSummary(
+      `Year Summary (${year} YTD)`,
+      "/api/yearly-summary-card",
+      date
+    );
+  }
 
-async function openAllTimeSummary() {
-  await openFetchedRangeSummary(
-    "All-Time Summary",
-    "2000-01-01",
-    toISODate(new Date())
-  );
-}
+  async function openAllTimeSummary() {
+    const date = toISODate(new Date());
+
+    openGeneratedSummary(
+      "All-Time Summary",
+      "/api/all-time-summary-card",
+      date
+    );
+  }
 
   function toggleSeries(k: SeriesKey) {
     setVisibleSeries((prev) => {
@@ -3676,6 +3905,9 @@ async function openAllTimeSummary() {
                         : "transparent";
 
                       const hot = hotStreakMap.get(iso) ?? 0;
+                      const holidayName =
+                        holidayMap.get(iso) ?? null;
+                      const isHoliday = Boolean(holidayName);
 
                       return (
   <td
@@ -3694,7 +3926,9 @@ async function openAllTimeSummary() {
     onMouseEnter={(e) => {
       e.currentTarget.style.transform = "translateY(-2px)";
       e.currentTarget.style.boxShadow =
-        hot > 1
+        isHoliday
+          ? "0 0 0 1px rgba(215,177,74,0.22) inset, 0 8px 22px rgba(215,177,74,0.12)"
+          : hot > 1
           ? "0 0 0 1px rgba(215,177,74,0.18) inset, 0 8px 18px rgba(0,0,0,0.24)"
           : total > 0
           ? "0 0 0 1px rgba(255,255,255,0.02) inset, 0 8px 18px rgba(0,0,0,0.24)"
@@ -3703,7 +3937,9 @@ async function openAllTimeSummary() {
     onMouseLeave={(e) => {
       e.currentTarget.style.transform = "translateY(0px)";
       e.currentTarget.style.boxShadow =
-        hot > 1
+        isHoliday
+          ? "0 0 0 1px rgba(215,177,74,0.16) inset"
+          : hot > 1
           ? "0 0 0 1px rgba(215,177,74,0.18) inset"
           : total > 0
           ? "0 0 0 1px rgba(255,255,255,0.02) inset"
@@ -3711,17 +3947,20 @@ async function openAllTimeSummary() {
     }}
     style={{
       border: `1px solid ${
-        hot > 1
+        isHoliday
+          ? "rgba(215,177,74,0.38)"
+          : hot > 1
           ? "rgba(215,177,74,0.55)"
           : total > 0
           ? "rgba(255,255,255,0.10)"
           : THEME.border
       }`,
       borderRadius: 16,
-      background:
-        total > 0
-          ? `linear-gradient(180deg, ${bg}, rgba(0,0,0,0.35))`
-          : "rgba(255,255,255,0.01)",
+      background: isHoliday
+        ? "linear-gradient(135deg, rgba(215,177,74,0.13), rgba(215,177,74,0.035))"
+        : total > 0
+        ? `linear-gradient(180deg, ${bg}, rgba(0,0,0,0.35))`
+        : "rgba(255,255,255,0.01)",
       minHeight: 118,
       padding: 10,
       position: "relative",
@@ -3729,7 +3968,9 @@ async function openAllTimeSummary() {
       flexDirection: "column",
       justifyContent: "space-between",
       boxShadow:
-        hot > 1
+        isHoliday
+          ? "0 0 0 1px rgba(215,177,74,0.16) inset"
+          : hot > 1
           ? "0 0 0 1px rgba(215,177,74,0.18) inset"
           : total > 0
           ? "0 0 0 1px rgba(255,255,255,0.02) inset"
@@ -3739,7 +3980,17 @@ async function openAllTimeSummary() {
         "transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease",
 
     }}
-      title={`${shortDateLabel(iso)}${total > 0 ? ` • Net ${wins - losses >= 0 ? "+" : ""}${wins - losses}` : ""}`}
+      title={`${shortDateLabel(iso)}${
+        holidayName
+          ? ` • ${holidayName} • US Markets Closed`
+          : ""
+      }${
+        total > 0
+          ? ` • Net ${
+              wins - losses >= 0 ? "+" : ""
+            }${wins - losses}`
+          : ""
+      }`}
     >
       <div
         style={{
@@ -3762,6 +4013,23 @@ async function openAllTimeSummary() {
         </div>
 
       </div>
+
+      {isHoliday && (
+        <div
+          title={`${holidayName} • US Markets Closed`}
+          style={{
+            marginTop: 8,
+            paddingRight: hot > 1 ? 34 : 0,
+            color: THEME.gold,
+            fontSize: 11,
+            fontWeight: 950,
+            lineHeight: "14px",
+            letterSpacing: 0.1,
+          }}
+        >
+          {holidayName}
+        </div>
+      )}
 
       {calendarDensity === "detailed" ? (
   total > 0 ? (
@@ -3907,7 +4175,14 @@ async function openAllTimeSummary() {
   }}
 >
   <div
-  onClick={() => openRangeSummary(`Week Summary (${label})`, startISO, endISO)}
+  onClick={() =>
+  openRangeSummary(
+    `Week Summary (${label})`,
+    startISO,
+    endISO,
+    "weekly"
+  )
+}
   onMouseEnter={() => setWeekPreview(range)}
   onMouseLeave={() => {
     if (!isPinned) setWeekPreview(null);
@@ -4036,534 +4311,46 @@ async function openAllTimeSummary() {
             </tbody>
           </table>
         </div>
+
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            fontWeight: 800,
+            opacity: 0.72,
+          }}
+        >
+          US federal holidays use observed dates and are lightly shaded.
+        </div>
       </div>
             {/* Day Modal */}
-      {modalOpen && selectedISO && (
-        <div
-          onClick={closeModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.65)",
-            backdropFilter: "blur(6px)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 50,
-            padding: 20,
-          }}
-        >
-          <div
-                onClick={(e) => e.stopPropagation()}
-                  style={{
-                      width: "min(720px, 100%)",
-                      background:
-                        "linear-gradient(135deg, rgba(25,25,30,0.95), rgba(10,10,12,0.95))",
-                      borderRadius: 18,
-                      padding: 18,
-                      border: `1px solid ${THEME.border}`,
-                      boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-                      animation: "fadeIn 0.18s ease-out",
-                    }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>
-                  Daily Breakdown
-                </div>
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 950,
-                    color: THEME.gold,
-                    letterSpacing: 0.35,
-                    lineHeight: 1.05,
-                  }}
-                 >
-                    {shortDateLabel(selectedISO)}
-                  </div>
-                <div style={{ fontSize: 12, opacity: 0.72, fontWeight: 800, marginTop: 4 }}>
-                  Outcomes by session for the selected trading day.
-                </div>
-              </div>
-
-              <button
-                  onClick={closeModal}
-                    style={{
-                      border: `1px solid ${THEME.border}`,
-                      borderRadius: 10,
-                      padding: "6px 10px",
-                      background: "rgba(255,255,255,0.05)",
-                      cursor: "pointer",
-                      }}
-              >
-                  Close
-              </button>
-            </div>
-              <div
-                style={{
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)",
-                  margin: "12px 0 4px",
-                }}
-                />
-            <div style={{ height: 10 }} />
-
-            {selectedDayStats && (
-  <>
-    <div
-      style={{
-        border: `1px solid ${THEME.border}`,
-        borderRadius: 16,
-        padding: "14px 16px",
-        background:
-          selectedDayStats.net >= 0
-            ? "linear-gradient(180deg, rgba(85,255,138,0.10), rgba(255,255,255,0.02))"
-            : "linear-gradient(180deg, rgba(255,92,92,0.10), rgba(255,255,255,0.02))",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 14,
-        flexWrap: "wrap",
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 900,
-            opacity: 0.72,
-            textTransform: "uppercase",
-            letterSpacing: 0.3,
-          }}
-        >
-          Net Day Result
-        </div>
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 24,
-            fontWeight: 950,
-            lineHeight: 1,
-            color: selectedDayStats.net >= 0 ? THEME.green : THEME.red,
-          }}
-        >
-          {selectedDayStats.net >= 0
-            ? `+${selectedDayStats.net}`
-            : selectedDayStats.net}
-        </div>
-      </div>
-
-      <div
-  style={{
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  }}
->
-  <span
-    style={{
-      border: `1px solid ${THEME.border}`,
-      background: "rgba(255,255,255,0.03)",
-      borderRadius: 999,
-      padding: "6px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-      opacity: 0.9,
-      whiteSpace: "nowrap",
-    }}
-  >
-    Total: <span style={{ color: THEME.gold }}>{selectedDayStats.total}</span>
-  </span>
-
-  <span
-    style={{
-      border: `1px solid ${THEME.border}`,
-      background: "rgba(255,255,255,0.03)",
-      borderRadius: 999,
-      padding: "6px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-      opacity: 0.9,
-      whiteSpace: "nowrap",
-    }}
-  >
-    Win rate: <span style={{ color: THEME.gold }}>{fmtPct01(selectedDayStats.wr)}</span>
-  </span>
-
-  <span
-    style={{
-      border:
-        selectedDayStats.bestSession.net > 0
-          ? `1px solid rgba(215,177,74,0.28)`
-          : `1px solid ${THEME.border}`,
-      background:
-        selectedDayStats.bestSession.net > 0
-          ? "rgba(215,177,74,0.08)"
-          : "rgba(255,255,255,0.03)",
-      borderRadius: 999,
-      padding: "6px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-      opacity: 0.95,
-      whiteSpace: "nowrap",
-      boxShadow:
-        selectedDayStats.bestSession.net > 0
-          ? "0 0 12px rgba(215,177,74,0.12)"
-          : "none",
-    }}
-  >
-    Best session:{" "}
-    <span style={{ color: THEME.blue }}>
-      {selectedDayStats.bestSession.label}
-    </span>
-  </span>
-
-  {selectedDayStats.hot > 1 && (
-    <span
-      style={{
-        border: `1px solid rgba(215,177,74,0.24)`,
-        background: "rgba(215,177,74,0.08)",
-        borderRadius: 999,
-        padding: "6px 10px",
-        fontSize: 11,
-        fontWeight: 700,
-        color: THEME.gold,
-        whiteSpace: "nowrap",
-      }}
-    >
-      🔥 {selectedDayStats.hot}-day streak
-    </span>
-  )}
-</div>
-    </div>
-
-    <div style={{ height: 14 }} />
-  </>
+{/* Daily recap modal */}
+{modalOpen && selectedISO && (
+  <RecapImageModal
+    src={
+      `/api/daily-summary-card` +
+      `?date=${encodeURIComponent(selectedISO)}`
+    }
+    alt={`Daily recap for ${selectedISO}`}
+    onClose={closeModal}
+    maxWidth={1000}
+  />
 )}
 
-            <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 12,
-  }}
->
-  {[
-    {
-      title: "TP Hits",
-      value: fmtInt(safeNum(selectedDay?.overall?.wins)),
-      color: THEME.green,
-      icon: "☑",
-    },
-    {
-      title: "SL Hits",
-      value: fmtInt(safeNum(selectedDay?.overall?.losses)),
-      color: THEME.red,
-      icon: "✕",
-    },
-    {
-      title: "B/E",
-      value: fmtInt(safeNum(selectedDay?.overall?.breakevens)),
-      color: THEME.gold,
-      icon: "■",
-    },
-  ].map((item) => (
-    <div
-      key={item.title}
-      style={{
-        border: `1px solid ${THEME.border}`,
-        borderLeft: `3px solid ${item.color}`,
-        borderRadius: 16,
-        background: "rgba(255,255,255,0.02)",
-        padding: 14,
-        minHeight: 92,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 950,
-            color: THEME.gold,
-          }}
-        >
-          {item.title}
-        </div>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 950,
-            color: item.color,
-            opacity: 0.95,
-          }}
-        >
-          {item.icon}
-        </div>
-      </div>
-
-      <div
-        style={{
-          textAlign: "right",
-          fontSize: 18,
-          fontWeight: 950,
-          color: "#fff",
-          lineHeight: 1,
-        }}
-      >
-        {item.value}
-      </div>
-    </div>
-  ))}
-</div>
-
-            <div style={{ height: 14 }} />
-
-            <div>
-  <div
-    style={{
-      fontSize: 13,
-      fontWeight: 950,
-      color: THEME.gold,
-      marginBottom: 4,
+{/* Discord-matched Weekly / Monthly recap modal */}
+{summaryOpen && summaryCardUrl && (
+  <RecapImageModal
+    src={summaryCardUrl}
+    alt={summaryTitle}
+    onClose={() => {
+      setSummaryOpen(false);
+      setSummaryCardUrl(null);
     }}
-  >
-    Session Breakdown
-  </div>
-  <div
-    style={{
-      fontSize: 12,
-      fontWeight: 800,
-      opacity: 0.72,
-      marginBottom: 12,
-    }}
-  >
-    Tokyo • London • NYC
-  </div>
-
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-      gap: 12,
-    }}
-  >
-    {(["tokyo", "london", "nyc"] as Session[]).map((s) => {
-      const r = selectedDay?.perSess?.get(s);
-      const wins = safeNum(r?.wins);
-      const losses = safeNum(r?.losses);
-      const breakevens = safeNum(r?.breakevens);
-      const wr = winRatePct(wins, losses);
-      const label = s.toUpperCase();
-      const sessionRun =
-        selectedISO ? sessionNoLossRunMaps[s].get(selectedISO) ?? 0 : 0;
-
-      return (
-        <div
-          key={s}
-            style={{
-              border:
-                selectedDayStats?.bestSession.label === label
-                  ? "1px solid rgba(215,177,74,0.42)"
-                  : `1px solid ${THEME.border}`,
-              borderRadius: 16,
-              background:
-                selectedDayStats?.bestSession.label === label
-                  ? "linear-gradient(180deg, rgba(215,177,74,0.08), rgba(255,255,255,0.02))"
-                  : "rgba(255,255,255,0.02)",
-              padding: 14,
-              boxShadow:
-                selectedDayStats?.bestSession.label === label
-                  ? "0 0 18px rgba(215,177,74,0.10)"
-                  : "none",
-                }}
-          >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <div
-  style={{
-    fontWeight: 950,
-    fontSize: 16,
-    color: THEME.gold,
-    letterSpacing: 0.4,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  }}
->
-  <span>{label}</span>
-
-  {sessionRun > 1 && (
-    <span
-      title={`${label} no-loss run: ${sessionRun}`}
-      style={{
-        color: THEME.gold,
-        fontSize: 13,
-        fontWeight: 950,
-        padding: "3px 7px",
-        borderRadius: 999,
-        border: "1px solid rgba(215,177,74,0.24)",
-        background: "rgba(215,177,74,0.08)",
-        lineHeight: 1,
-      }}
-    >
-      🔥{sessionRun}
-    </span>
-  )}
-</div>
-
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 900,
-                opacity: 0.82,
-              }}
-            >
-              {wins + losses + breakevens > 0 ? "Reported" : "—"}
-            </div>
-          </div>
-
-          <div style={{ height: 16 }} />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 10,
-              alignItems: "end",
-            }}
-          >
-            <div style={{ textAlign: "left" }}>
-              <div
-                style={{
-                  color: THEME.green,
-                  fontWeight: 950,
-                  fontSize: 26,
-                  lineHeight: 1,
-                }}
-              >
-                {wins}
-              </div>
-            </div>
-
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  color: THEME.gold,
-                  fontWeight: 950,
-                  fontSize: 22,
-                  lineHeight: 1,
-                }}
-              >
-                {breakevens}
-              </div>
-            </div>
-
-            <div style={{ textAlign: "right" }}>
-              <div
-                style={{
-                  color: THEME.red,
-                  fontWeight: 950,
-                  fontSize: 26,
-                  lineHeight: 1,
-                }}
-              >
-                {losses}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ height: 8 }} />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 10,
-              fontSize: 11,
-              fontWeight: 900,
-              opacity: 0.85,
-            }}
-          >
-            <div style={{ textAlign: "left" }}>TP</div>
-            <div style={{ textAlign: "center" }}>BE</div>
-            <div style={{ textAlign: "right" }}>SL</div>
-          </div>
-
-          <div style={{ height: 14 }} />
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 10,
-              fontSize: 12,
-              fontWeight: 850,
-            }}
-          >
-            <span style={{ opacity: 0.8 }}>Win rate</span>
-            <span style={{ color: THEME.gold }}>
-              {fmtPct01(wr)}
-            </span>
-          </div>
-
-          <div style={{ height: 10 }} />
-
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 900,
-              opacity: 0.72,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 10,
-            }}
-            >
-              <span>Net</span>
-            <span style={{ color: wins - losses >= 0 ? THEME.green : THEME.red }}>
-              {wins - losses >= 0 ? `+${wins - losses}` : wins - losses}
-            </span>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</div>
-
-
-          </div>
-        </div>
-      )}
-
+    maxWidth={1000}
+  />
+)}
       {/* Summary Modal */}
-      {summaryOpen && (
+      {summaryOpen && !summaryCardUrl && (
         <div
           onClick={() => setSummaryOpen(false)}
           style={{
@@ -4962,6 +4749,82 @@ async function openAllTimeSummary() {
         </div>
       )}
     </main>
+  );
+}
+
+function RecapImageModal({
+  src,
+  alt,
+  onClose,
+  maxWidth = 1000,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+  maxWidth?: number;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        padding: 20,
+        display: "grid",
+        placeItems: "center",
+        background: "rgba(0,0,0,0.76)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
+      <div
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+        style={{
+          width: `min(${maxWidth}px, 100%)`,
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+          borderRadius: 18,
+          border:
+            "1px solid rgba(255,255,255,0.10)",
+          background:
+            "linear-gradient(135deg, rgba(25,25,30,0.98), rgba(8,8,10,0.98))",
+          boxShadow:
+            "0 24px 80px rgba(0,0,0,0.72)",
+          padding: 12,
+          animation:
+            "fadeIn 0.18s ease-out",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={btnPrimary(false)}
+          >
+            Close
+          </button>
+        </div>
+
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "auto",
+            borderRadius: 14,
+          }}
+        />
+      </div>
+    </div>
   );
 }
 

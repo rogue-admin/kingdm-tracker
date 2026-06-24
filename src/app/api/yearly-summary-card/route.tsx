@@ -42,69 +42,48 @@ function fmtNet(value: number) {
 
 function winRate(wins: number, losses: number) {
   const total = wins + losses;
+  return total > 0 ? `${((wins / total) * 100).toFixed(1)}%` : "0.0%";
+}
 
-  return total > 0
-    ? `${((wins / total) * 100).toFixed(1)}%`
-    : "0.0%";
+function parseISODate(value: string) {
+  return new Date(`${value}T00:00:00Z`);
 }
 
 function iso(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function mondayOf(date: Date) {
-  const result = new Date(date);
-  const day = result.getDay();
-  const difference = day === 0 ? 6 : day - 1;
-
-  result.setDate(result.getDate() - difference);
-  result.setHours(0, 0, 0, 0);
-
-  return result;
+function yearStartOf(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
 }
 
-function sundayOf(date: Date) {
-  const result = mondayOf(date);
+function monthStartOf(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
 
-  result.setDate(result.getDate() + 6);
-  result.setHours(0, 0, 0, 0);
-
-  return result;
+function monthEndOf(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 }
 
 function shortDate(date: Date) {
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
-function dateRangeLabel(start: Date, end: Date) {
-  const sameYear = start.getFullYear() === end.getFullYear();
-  const sameMonth =
-    sameYear && start.getMonth() === end.getMonth();
-
-  if (sameMonth) {
-    return `${start.toLocaleDateString("en-US", {
-      month: "short",
-    })} ${start.getDate()} – ${end.getDate()}, ${end.getFullYear()}`;
-  }
-
-  if (sameYear) {
-    return `${shortDate(start)} – ${shortDate(
-      end
-    )}, ${end.getFullYear()}`;
-  }
-
-  return `${shortDate(start)}, ${start.getFullYear()} – ${shortDate(
-    end
-  )}, ${end.getFullYear()}`;
+function monthLabel(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function sessionMeta(session: Session) {
   if (session === "tokyo") {
     return {
-      label: "Tokyo",
       fullLabel: "🇯🇵 Tokyo",
       accent: "#ff5c5c",
     };
@@ -112,14 +91,12 @@ function sessionMeta(session: Session) {
 
   if (session === "london") {
     return {
-      label: "London",
       fullLabel: "🇬🇧 London",
       accent: "#4ea3ff",
     };
   }
 
   return {
-    label: "NYC",
     fullLabel: "🇺🇸 NYC",
     accent: "#a855f7",
   };
@@ -139,21 +116,13 @@ function sumOverallRows(rows: DailyOverallRow[]) {
       total.w += safeNum(row.wins);
       total.l += safeNum(row.losses);
       total.be += safeNum(row.breakevens);
-
       return total;
     },
-    {
-      w: 0,
-      l: 0,
-      be: 0,
-    }
+    { w: 0, l: 0, be: 0 }
   );
 }
 
-function calcSessionStreak(
-  rows: DailySessionRow[],
-  session: Session
-) {
+function calcSessionStreak(rows: DailySessionRow[], session: Session) {
   const filtered = rows
     .filter((row) => row.session === session)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -165,15 +134,11 @@ function calcSessionStreak(
     const losses = safeNum(row.losses);
     const breakevens = safeNum(row.breakevens);
 
-    // Empty or unreported rows do not count and do not end a run.
-    if (!hasReportedOutcome(wins, losses, breakevens)) {
-      continue;
-    }
+    // Empty days do not count and do not break the no-loss run.
+    if (!hasReportedOutcome(wins, losses, breakevens)) continue;
 
-    // Any loss ends the no-loss run.
-    if (losses > 0) {
-      break;
-    }
+    // Any reported loss ends the run.
+    if (losses > 0) break;
 
     streak += 1;
   }
@@ -181,94 +146,110 @@ function calcSessionStreak(
   return streak;
 }
 
+function getBestMonth(rows: DailyOverallRow[]) {
+  const months = new Map<
+    string,
+    {
+      start: Date;
+      end: Date;
+      wins: number;
+      losses: number;
+      breakevens: number;
+      net: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const wins = safeNum(row.wins);
+    const losses = safeNum(row.losses);
+    const breakevens = safeNum(row.breakevens);
+
+    if (!hasReportedOutcome(wins, losses, breakevens)) continue;
+
+    const rowDate = parseISODate(row.date);
+    const start = monthStartOf(rowDate);
+    const end = monthEndOf(rowDate);
+    const key = iso(start);
+
+    const existing = months.get(key) ?? {
+      start,
+      end,
+      wins: 0,
+      losses: 0,
+      breakevens: 0,
+      net: 0,
+    };
+
+    existing.wins += wins;
+    existing.losses += losses;
+    existing.breakevens += breakevens;
+    existing.net = existing.wins - existing.losses;
+
+    months.set(key, existing);
+  }
+
+  return (
+    Array.from(months.values()).sort(
+      (a, b) => b.net - a.net || b.wins - a.wins
+    )[0] ?? null
+  );
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const date = url.searchParams.get("date") ?? iso(new Date());
 
-  const supabase = createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const targetDate = new Date(`${date}T00:00:00`);
-  const weekStartDate = mondayOf(targetDate);
-  const weekEndDate = sundayOf(targetDate);
+  const targetDate = parseISODate(date);
+  const yearStartDate = yearStartOf(targetDate);
+  const yearStart = iso(yearStartDate);
+  const yearEnd = date;
 
-  const weekStart = iso(weekStartDate);
-  const weekEnd = iso(weekEndDate);
-
+  // Look back far enough for streaks that began in the previous year.
   const streakStartDate = new Date(targetDate);
-  streakStartDate.setDate(streakStartDate.getDate() - 120);
-
+  streakStartDate.setUTCDate(streakStartDate.getUTCDate() - 400);
   const streakStart = iso(streakStartDate);
 
-  const [
-    weekSessionRes,
-    weekOverallRes,
-    streakSessionRes,
-  ] = await Promise.all([
-    supabase
-      .from("v_public_daily_outcomes")
-      .select("date,session,wins,losses,breakevens")
-      .gte("date", weekStart)
-      .lte("date", weekEnd),
+  const [yearSessionRes, yearOverallRes, streakSessionRes] =
+    await Promise.all([
+      supabase
+        .from("v_public_daily_outcomes")
+        .select("date,session,wins,losses,breakevens")
+        .gte("date", yearStart)
+        .lte("date", yearEnd),
 
-    supabase
-      .from("v_public_daily_overall")
-      .select("date,wins,losses,breakevens")
-      .gte("date", weekStart)
-      .lte("date", weekEnd),
+      supabase
+        .from("v_public_daily_overall")
+        .select("date,wins,losses,breakevens")
+        .gte("date", yearStart)
+        .lte("date", yearEnd),
 
-    supabase
-      .from("v_public_daily_outcomes")
-      .select("date,session,wins,losses,breakevens")
-      .gte("date", streakStart)
-      .lte("date", date),
-  ]);
+      supabase
+        .from("v_public_daily_outcomes")
+        .select("date,session,wins,losses,breakevens")
+        .gte("date", streakStart)
+        .lte("date", yearEnd),
+    ]);
 
-  if (weekSessionRes.error) {
-    throw weekSessionRes.error;
-  }
+  if (yearSessionRes.error) throw yearSessionRes.error;
+  if (yearOverallRes.error) throw yearOverallRes.error;
+  if (streakSessionRes.error) throw streakSessionRes.error;
 
-  if (weekOverallRes.error) {
-    throw weekOverallRes.error;
-  }
-
-  if (streakSessionRes.error) {
-    throw streakSessionRes.error;
-  }
-
-  const weekSessionRows =
-    (weekSessionRes.data ?? []) as DailySessionRow[];
-
-  const weekOverallRows =
-    (weekOverallRes.data ?? []) as DailyOverallRow[];
-
+  const yearSessionRows =
+    (yearSessionRes.data ?? []) as DailySessionRow[];
+  const yearOverallRows =
+    (yearOverallRes.data ?? []) as DailyOverallRow[];
   const streakSessionRows =
     (streakSessionRes.data ?? []) as DailySessionRow[];
 
   const bySession: Record<Session, SessionTotals> = {
-    tokyo: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
-    london: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
-    nyc: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
+    tokyo: { w: 0, l: 0, be: 0, reported: false },
+    london: { w: 0, l: 0, be: 0, reported: false },
+    nyc: { w: 0, l: 0, be: 0, reported: false },
   };
 
-  weekSessionRows.forEach((row) => {
+  yearSessionRows.forEach((row) => {
     const wins = safeNum(row.wins);
     const losses = safeNum(row.losses);
     const breakevens = safeNum(row.breakevens);
@@ -282,11 +263,11 @@ export async function GET(req: Request) {
     }
   });
 
-  const weekly = sumOverallRows(weekOverallRows);
-  const weeklyNet = weekly.w - weekly.l;
+  const yearly = sumOverallRows(yearOverallRows);
+  const yearlyNet = yearly.w - yearly.l;
 
   const bestDay =
-    weekOverallRows
+    yearOverallRows
       .map((row) => {
         const wins = safeNum(row.wins);
         const losses = safeNum(row.losses);
@@ -294,31 +275,27 @@ export async function GET(req: Request) {
 
         return {
           date: row.date,
-          wins,
-          losses,
-          breakevens,
           net: wins - losses,
-          reported: hasReportedOutcome(
-            wins,
-            losses,
-            breakevens
-          ),
+          wins,
+          reported: hasReportedOutcome(wins, losses, breakevens),
         };
       })
       .filter((row) => row.reported)
-      .sort((a, b) => b.net - a.net)[0] ?? null;
+      .sort((a, b) => b.net - a.net || b.wins - a.wins)[0] ?? null;
 
-  const sessionResults = (
-    ["tokyo", "london", "nyc"] as Session[]
-  ).map((session) => {
-    const totals = bySession[session];
+  const bestMonth = getBestMonth(yearOverallRows);
 
-    return {
-      session,
-      ...totals,
-      net: totals.w - totals.l,
-    };
-  });
+  const sessionResults = (['tokyo', 'london', 'nyc'] as Session[]).map(
+    (session) => {
+      const totals = bySession[session];
+
+      return {
+        session,
+        ...totals,
+        net: totals.w - totals.l,
+      };
+    }
+  );
 
   const reportedSessionResults = sessionResults.filter(
     (result) => result.reported
@@ -326,26 +303,13 @@ export async function GET(req: Request) {
 
   const bestSessionNet =
     reportedSessionResults.length > 0
-      ? Math.max(
-          ...reportedSessionResults.map(
-            (result) => result.net
-          )
-        )
+      ? Math.max(...reportedSessionResults.map((result) => result.net))
       : null;
 
   const sessionStreaks: Record<Session, number> = {
-    tokyo: calcSessionStreak(
-      streakSessionRows,
-      "tokyo"
-    ),
-    london: calcSessionStreak(
-      streakSessionRows,
-      "london"
-    ),
-    nyc: calcSessionStreak(
-      streakSessionRows,
-      "nyc"
-    ),
+    tokyo: calcSessionStreak(streakSessionRows, "tokyo"),
+    london: calcSessionStreak(streakSessionRows, "london"),
+    nyc: calcSessionStreak(streakSessionRows, "nyc"),
   };
 
   return new ImageResponse(
@@ -360,7 +324,7 @@ export async function GET(req: Request) {
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "34px 48px",
+          padding: "32px 48px",
           fontFamily: "Arial",
         }}
       >
@@ -381,19 +345,12 @@ export async function GET(req: Request) {
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="116"
-              height="116"
-              style={{
-                display: "flex",
-              }}
+              width="96"
+              height="96"
+              style={{ display: "flex" }}
             />
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
+            <div style={{ display: "flex", flexDirection: "column" }}>
               <div
                 style={{
                   display: "flex",
@@ -415,7 +372,7 @@ export async function GET(req: Request) {
                   lineHeight: 1,
                 }}
               >
-                Weekly Recap
+                Yearly Recap
               </div>
             </div>
           </div>
@@ -423,39 +380,29 @@ export async function GET(req: Request) {
           <div
             style={{
               display: "flex",
-              fontSize: 26,
+              fontSize: 28,
               opacity: 0.76,
               paddingTop: 6,
             }}
           >
-            {dateRangeLabel(
-              weekStartDate,
-              weekEndDate
-            )}
+            {targetDate.getUTCFullYear()} YTD
           </div>
         </div>
 
-        {/* Weekly total */}
+        {/* Total year result */}
         <div
           style={{
-            marginTop: 20,
+            marginTop: 18,
             borderRadius: 28,
-            border:
-              "2px solid rgba(215,177,74,0.45)",
-            backgroundColor:
-              "rgba(215,177,74,0.07)",
+            border: "2px solid rgba(215,177,74,0.45)",
+            backgroundColor: "rgba(215,177,74,0.07)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "17px 24px",
+            padding: "16px 24px",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column" }}>
             <div
               style={{
                 display: "flex",
@@ -464,53 +411,30 @@ export async function GET(req: Request) {
                 fontWeight: 900,
               }}
             >
-              TOTAL WEEK RESULT
+              TOTAL YEAR RESULT
             </div>
 
             <div
               style={{
                 display: "flex",
                 marginTop: 5,
-                fontSize: 78,
+                fontSize: 76,
                 fontWeight: 900,
                 lineHeight: 1,
-                color:
-                  weeklyNet >= 0
-                    ? "#55FF8A"
-                    : "#ff5c5c",
+                color: yearlyNet >= 0 ? "#55FF8A" : "#ff5c5c",
               }}
             >
-              {fmtNet(weeklyNet)}
+              {fmtNet(yearlyNet)}
             </div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 28,
-            }}
-          >
-            <MiniStat
-              label="TP"
-              value={weekly.w}
-              color="#55FF8A"
-            />
-
-            <MiniStat
-              label="SL"
-              value={weekly.l}
-              color="#ff5c5c"
-            />
-
-            <MiniStat
-              label="BE"
-              value={weekly.be}
-              color="#D7B14A"
-            />
-
+          <div style={{ display: "flex", gap: 28 }}>
+            <MiniStat label="TP" value={yearly.w} color="#55FF8A" />
+            <MiniStat label="SL" value={yearly.l} color="#ff5c5c" />
+            <MiniStat label="BE" value={yearly.be} color="#D7B14A" />
             <MiniStat
               label="WR"
-              value={winRate(weekly.w, weekly.l)}
+              value={winRate(yearly.w, yearly.l)}
               color="#D7B14A"
             />
           </div>
@@ -519,14 +443,13 @@ export async function GET(req: Request) {
         {/* Session cards */}
         <div
           style={{
-            marginTop: 17,
+            marginTop: 16,
             display: "flex",
             gap: 16,
           }}
         >
           {sessionResults.map((result) => {
             const meta = sessionMeta(result.session);
-
             const isBest =
               bestSessionNet !== null &&
               result.reported &&
@@ -541,96 +464,47 @@ export async function GET(req: Request) {
                 losses={result.l}
                 be={result.be}
                 net={result.net}
-                streak={
-                  sessionStreaks[result.session]
-                }
+                streak={sessionStreaks[result.session]}
                 isBest={isBest}
               />
             );
           })}
         </div>
 
-        {/* Best day */}
+        {/* Highlights */}
         <div
           style={{
-            marginTop: 17,
-            borderRadius: 18,
-            border:
-              "1px solid rgba(215,177,74,0.28)",
-            backgroundColor:
-              "rgba(215,177,74,0.06)",
+            marginTop: 16,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 20px",
+            gap: 16,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              color: "#D7B14A",
-              fontSize: 22,
-              fontWeight: 900,
-            }}
-          >
-            Best Day
-          </div>
+          <HighlightBox
+            label="Best Day"
+            value={
+              bestDay
+                ? `${new Date(`${bestDay.date}T00:00:00Z`).toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    }
+                  )} • ${fmtNet(bestDay.net)}`
+                : "No reported results"
+            }
+            positive={bestDay ? bestDay.net >= 0 : true}
+          />
 
-          {bestDay ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                fontSize: 24,
-                fontWeight: 900,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                }}
-              >
-                {new Date(
-                  `${bestDay.date}T00:00:00`
-                ).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  opacity: 0.48,
-                }}
-              >
-                •
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  color:
-                    bestDay.net >= 0
-                      ? "#55FF8A"
-                      : "#ff5c5c",
-                }}
-              >
-                {fmtNet(bestDay.net)}
-              </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                fontSize: 22,
-                opacity: 0.65,
-              }}
-            >
-              No reported results
-            </div>
-          )}
+          <HighlightBox
+            label="Best Month"
+            value={
+              bestMonth
+                ? `${monthLabel(bestMonth.start)} • ${fmtNet(bestMonth.net)}`
+                : "No reported results"
+            }
+            positive={bestMonth ? bestMonth.net >= 0 : true}
+          />
         </div>
       </div>
     ),
@@ -712,9 +586,7 @@ function SessionCard({
     ? "rgba(215,177,74,0.95)"
     : `${sessionColor}66`;
 
-  const titleColor = isBest
-    ? "#f0c75a"
-    : sessionColor;
+  const titleColor = isBest ? "#f0c75a" : sessionColor;
 
   const cardBackground = isBest
     ? "linear-gradient(135deg, rgba(215,177,74,0.16), rgba(255,255,255,0.04))"
@@ -733,7 +605,7 @@ function SessionCard({
         background: cardBackground,
         display: "flex",
         flexDirection: "column",
-        padding: "16px 18px",
+        padding: "15px 18px",
         boxShadow: cardShadow,
       }}
     >
@@ -765,10 +637,8 @@ function SessionCard({
               alignItems: "center",
               gap: 5,
               borderRadius: 999,
-              border:
-                "1px solid rgba(215,177,74,0.28)",
-              backgroundColor:
-                "rgba(215,177,74,0.08)",
+              border: "1px solid rgba(215,177,74,0.28)",
+              backgroundColor: "rgba(215,177,74,0.08)",
               padding: "4px 8px",
               color: "#D7B14A",
               fontSize: 16,
@@ -776,13 +646,8 @@ function SessionCard({
               lineHeight: 1,
             }}
           >
-            <div style={{ display: "flex" }}>
-              🔥
-            </div>
-
-            <div style={{ display: "flex" }}>
-              {streak}
-            </div>
+            <div style={{ display: "flex" }}>🔥</div>
+            <div style={{ display: "flex" }}>{streak}</div>
           </div>
         )}
       </div>
@@ -790,7 +655,7 @@ function SessionCard({
       <div
         style={{
           display: "flex",
-          marginTop: 10,
+          marginTop: 9,
           fontSize: 21,
           opacity: 0.86,
         }}
@@ -851,6 +716,53 @@ function SessionCard({
             {winRate(wins, losses)}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function HighlightBox({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive: boolean;
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        borderRadius: 18,
+        border: "1px solid rgba(215,177,74,0.28)",
+        backgroundColor: "rgba(215,177,74,0.06)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 20px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          color: "#D7B14A",
+          fontSize: 22,
+          fontWeight: 900,
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          fontSize: 23,
+          fontWeight: 900,
+          color: positive ? "white" : "#ff5c5c",
+        }}
+      >
+        {value}
       </div>
     </div>
   );

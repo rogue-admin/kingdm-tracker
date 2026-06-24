@@ -353,8 +353,8 @@ export async function GET(req: Request) {
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="116"
-              height="116"
+              width="96"
+              height="96"
               style={{ display: "flex" }}
             />
 
@@ -665,14 +665,56 @@ function SessionCard({
       <div
         style={{
           display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 14,
           marginTop: 9,
-          fontSize: 34,
-          fontWeight: 900,
-          lineHeight: 1,
-          color: net >= 0 ? "#55FF8A" : "#ff5c5c",
         }}
       >
-        Net {fmtNet(net)}
+        <div
+          style={{
+            display: "flex",
+            fontSize: 34,
+            fontWeight: 900,
+            lineHeight: 1,
+            color: net >= 0 ? "#55FF8A" : "#ff5c5c",
+          }}
+        >
+          Net {fmtNet(net)}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              color: "#D7B14A",
+              fontSize: 14,
+              fontWeight: 900,
+              lineHeight: 1,
+            }}
+          >
+            WR
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              marginTop: 5,
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 22,
+              fontWeight: 900,
+              lineHeight: 1,
+            }}
+          >
+            {winRate(wins, losses)}
+          </div>
+        </div>
       </div>
     </div>
   );

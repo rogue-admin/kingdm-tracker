@@ -5,19 +5,11 @@ export const runtime = "edge";
 
 const BASE_URL = "https://kingdm-tracker.vercel.app";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 type Session = "tokyo" | "london" | "nyc";
 
-type SessionTotals = {
-  w: number;
-  l: number;
-  be: number;
-  reported: boolean;
-};
-
-type DailySessionRow = {
+type DailyOutcomeRow = {
   date: string;
   session: Session;
   wins: number | null;
@@ -25,102 +17,93 @@ type DailySessionRow = {
   breakevens: number | null;
 };
 
-function safeNum(value: unknown) {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
+type DailyOverallRow = {
+  wins: number | null;
+  losses: number | null;
+  breakevens: number | null;
+};
+
+function safeNum(v: unknown) {
+  return Number(v ?? 0);
 }
 
-function fmtNet(value: number) {
-  return value >= 0 ? `+${value}` : String(value);
+function fmtNet(n: number) {
+  return n >= 0 ? `+${n}` : String(n);
 }
 
-function winRate(wins: number, losses: number) {
-  const denominator = wins + losses;
-
-  return denominator > 0
-    ? `${((wins / denominator) * 100).toFixed(1)}%`
-    : "0.0%";
+function winRate(w: number, l: number) {
+  const denom = w + l;
+  return denom > 0 ? `${((w / denom) * 100).toFixed(1)}%` : "0.0%";
 }
 
-function mondayOf(date: Date) {
-  const day = date.getDay();
-  const difference = day === 0 ? 6 : day - 1;
-  const result = new Date(date);
-
-  result.setDate(result.getDate() - difference);
-
-  return result;
+function mondayOf(d: Date) {
+  const dow = d.getDay();
+  const diff = dow === 0 ? 6 : dow - 1;
+  const x = new Date(d);
+  x.setDate(x.getDate() - diff);
+  return x;
 }
 
-function iso(date: Date) {
-  return date.toISOString().slice(0, 10);
+function iso(d: Date) {
+  return d.toISOString().slice(0, 10);
 }
 
 function sessionName(session: Session) {
-  if (session === "tokyo") return "🇯🇵 Tokyo";
-  if (session === "london") return "🇬🇧 London";
-
-  return "🇺🇸 NYC";
+  if (session === "tokyo") return "Tokyo";
+  if (session === "london") return "London";
+  return "NYC";
 }
 
-function sessionColor(session: Session) {
-  if (session === "tokyo") {
-    return {
-      border: "rgba(255,77,77,0.58)",
-      accent: "#ff4d4d",
-      background: "rgba(255,77,77,0.035)",
-    };
-  }
-
-  if (session === "london") {
-    return {
-      border: "rgba(59,130,246,0.62)",
-      accent: "#3b82f6",
-      background: "rgba(59,130,246,0.035)",
-    };
-  }
-
-  return {
-    border: "rgba(168,85,247,0.62)",
-    accent: "#a855f7",
-    background: "rgba(168,85,247,0.035)",
-  };
+function sessionFlag(session: Session) {
+  if (session === "tokyo") return "🇯🇵";
+  if (session === "london") return "🇬🇧";
+  return "🇺🇸";
 }
 
-function hasReportedOutcome(
-  wins: number,
-  losses: number,
-  breakevens: number
+function sessionAccent(session: Session) {
+  if (session === "tokyo") return "#ff5c5c";
+  if (session === "london") return "#4ea3ff";
+  return "#a855f7";
+}
+
+function sumRows(rows: DailyOverallRow[] | null | undefined) {
+  return (rows ?? []).reduce(
+    (acc, r) => {
+      acc.w += safeNum(r.wins);
+      acc.l += safeNum(r.losses);
+      acc.be += safeNum(r.breakevens);
+      return acc;
+    },
+    { w: 0, l: 0, be: 0 }
+  );
+}
+
+async function getSessionStreak(
+  supabase: any,
+  session: Session,
+  date: string
 ) {
-  return wins + losses + breakevens > 0;
-}
+  const { data } = await supabase
+    .from("v_public_daily_outcomes")
+    .select("date,session,wins,losses,breakevens")
+    .eq("session", session)
+    .lte("date", date)
+    .order("date", { ascending: false })
+    .limit(60);
 
-function calculateSessionStreak(
-  rows: DailySessionRow[],
-  session: Session
-) {
-  const sessionRows = rows
-    .filter((row) => row.session === session)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const rows = (data ?? []) as DailyOutcomeRow[];
 
   let streak = 0;
 
-  for (const row of sessionRows) {
+  for (const row of rows) {
     const wins = safeNum(row.wins);
     const losses = safeNum(row.losses);
-    const breakevens = safeNum(row.breakevens);
 
-    // Ignore dates where this session was not reported.
-    if (!hasReportedOutcome(wins, losses, breakevens)) {
-      continue;
-    }
-
-    // Any loss immediately ends the no-loss run.
-    if (losses > 0) {
+    if (wins > losses) {
+      streak += 1;
+    } else {
       break;
     }
-
-    streak += 1;
   }
 
   return streak;
@@ -128,37 +111,25 @@ function calculateSessionStreak(
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  const date = url.searchParams.get("date") ?? iso(new Date());
 
-  const date =
-    url.searchParams.get("date") ?? iso(new Date());
-
-  const supabase = createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const targetDate = new Date(`${date}T00:00:00`);
   const weekStart = iso(mondayOf(targetDate));
   const monthStart = `${date.slice(0, 7)}-01`;
 
-  const streakStartDate = new Date(targetDate);
-  streakStartDate.setDate(
-    streakStartDate.getDate() - 365
-  );
-
-  const streakStart = iso(streakStartDate);
-
   const [
     dailyRes,
     weekRes,
     monthRes,
-    streakRes,
+    tokyoStreak,
+    londonStreak,
+    nycStreak,
   ] = await Promise.all([
     supabase
       .from("v_public_daily_outcomes")
-      .select(
-        "date,session,wins,losses,breakevens"
-      )
+      .select("date,session,wins,losses,breakevens")
       .eq("date", date),
 
     supabase
@@ -173,182 +144,84 @@ export async function GET(req: Request) {
       .gte("date", monthStart)
       .lte("date", date),
 
-    supabase
-      .from("v_public_daily_outcomes")
-      .select(
-        "date,session,wins,losses,breakevens"
-      )
-      .gte("date", streakStart)
-      .lte("date", date),
+    getSessionStreak(supabase, "tokyo", date),
+    getSessionStreak(supabase, "london", date),
+    getSessionStreak(supabase, "nyc", date),
   ]);
 
-  if (dailyRes.error) {
-    throw dailyRes.error;
-  }
-
-  if (weekRes.error) {
-    throw weekRes.error;
-  }
-
-  if (monthRes.error) {
-    throw monthRes.error;
-  }
-
-  if (streakRes.error) {
-    throw streakRes.error;
-  }
-
-  const dailyRows =
-    (dailyRes.data ?? []) as DailySessionRow[];
-
-  const streakRows =
-    (streakRes.data ?? []) as DailySessionRow[];
-
-  const bySession: Record<
-    Session,
-    SessionTotals
-  > = {
-    tokyo: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
-    london: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
-    nyc: {
-      w: 0,
-      l: 0,
-      be: 0,
-      reported: false,
-    },
+  const streaks: Record<Session, number> = {
+    tokyo: tokyoStreak,
+    london: londonStreak,
+    nyc: nycStreak,
   };
 
-  dailyRows.forEach((row) => {
-    const wins = safeNum(row.wins);
-    const losses = safeNum(row.losses);
-    const breakevens = safeNum(
-      row.breakevens
-    );
+  const bySession: Record<Session, { w: number; l: number; be: number }> = {
+    tokyo: { w: 0, l: 0, be: 0 },
+    london: { w: 0, l: 0, be: 0 },
+    nyc: { w: 0, l: 0, be: 0 },
+  };
 
-    bySession[row.session] = {
-      w: wins,
-      l: losses,
-      be: breakevens,
-      reported: hasReportedOutcome(
-        wins,
-        losses,
-        breakevens
-      ),
+  ((dailyRes.data ?? []) as DailyOutcomeRow[]).forEach((r) => {
+    bySession[r.session] = {
+      w: safeNum(r.wins),
+      l: safeNum(r.losses),
+      be: safeNum(r.breakevens),
     };
   });
 
   const daily = {
-    w:
-      bySession.tokyo.w +
-      bySession.london.w +
-      bySession.nyc.w,
-
-    l:
-      bySession.tokyo.l +
-      bySession.london.l +
-      bySession.nyc.l,
-
-    be:
-      bySession.tokyo.be +
-      bySession.london.be +
-      bySession.nyc.be,
+    w: bySession.tokyo.w + bySession.london.w + bySession.nyc.w,
+    l: bySession.tokyo.l + bySession.london.l + bySession.nyc.l,
+    be: bySession.tokyo.be + bySession.london.be + bySession.nyc.be,
   };
 
-  function sumRows(rows: unknown) {
-    return (
-      (rows ?? []) as Array<{
-        wins: number | null;
-        losses: number | null;
-        breakevens: number | null;
-      }>
-    ).reduce(
-      (total, row) => {
-        total.w += safeNum(row.wins);
-        total.l += safeNum(row.losses);
-        total.be += safeNum(
-          row.breakevens
-        );
-
-        return total;
-      },
-      {
-        w: 0,
-        l: 0,
-        be: 0,
-      }
-    );
-  }
-
-  const week = sumRows(weekRes.data);
-  const month = sumRows(monthRes.data);
+  const week = sumRows((weekRes.data ?? []) as DailyOverallRow[]);
+  const month = sumRows((monthRes.data ?? []) as DailyOverallRow[]);
 
   const dailyNet = daily.w - daily.l;
   const weekNet = week.w - week.l;
   const monthNet = month.w - month.l;
 
-  const sessionResults = (
-    ["tokyo", "london", "nyc"] as Session[]
-  ).map((session) => {
-    const totals = bySession[session];
+  const sessionCards = (["tokyo", "london", "nyc"] as Session[]).map(
+    (session) => {
+      const row = bySession[session];
+      const net = row.w - row.l;
 
-    return {
-      session,
-      ...totals,
-      net: totals.w - totals.l,
-    };
-  });
+      return {
+        session,
+        label: sessionName(session),
+        flag: sessionFlag(session),
+        accent: sessionAccent(session),
+        w: row.w,
+        l: row.l,
+        be: row.be,
+        net,
+        streak: streaks[session] ?? 0,
+      };
+    }
+  );
 
-  const bestSession =
-    sessionResults
-      .filter((result) => result.reported)
-      .sort(
-        (a, b) =>
-          b.net - a.net || b.w - a.w
-      )[0] ?? null;
+  const bestNet = Math.max(...sessionCards.map((s) => s.net));
+  const winners =
+    bestNet > 0
+      ? sessionCards.filter((s) => s.net === bestNet).map((s) => s.session)
+      : [];
 
-  const sessionStreaks: Record<
-    Session,
-    number
-  > = {
-    tokyo: calculateSessionStreak(
-      streakRows,
-      "tokyo"
-    ),
-
-    london: calculateSessionStreak(
-      streakRows,
-      "london"
-    ),
-
-    nyc: calculateSessionStreak(
-      streakRows,
-      "nyc"
-    ),
-  };
+  const winnerSet = new Set<Session>(winners);
 
   return new ImageResponse(
     (
       <div
         style={{
           width: "1200px",
-          height: "630px",
+          height: "680px",
           backgroundColor: "rgb(9,9,11)",
           backgroundImage:
             "radial-gradient(circle at 18% 16%, rgba(140,95,255,0.32), rgba(0,0,0,0) 34%), radial-gradient(circle at 86% 10%, rgba(215,177,74,0.28), rgba(0,0,0,0) 36%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "18px 58px 26px 58px",
+          padding: "44px 54px",
           fontFamily: "Arial",
         }}
       >
@@ -356,25 +229,22 @@ export async function GET(req: Request) {
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            justifyContent:
-              "space-between",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
           }}
         >
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 14,
+              gap: 18,
             }}
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
-              width="112"
-              height="112"
-              style={{
-                display: "flex",
-              }}
+              width="96"
+              height="96"
+              style={{ display: "flex" }}
             />
 
             <div
@@ -389,6 +259,7 @@ export async function GET(req: Request) {
                   color: "#D7B14A",
                   fontSize: 34,
                   fontWeight: 900,
+                  lineHeight: 1,
                 }}
               >
                 The Kingdm
@@ -397,8 +268,10 @@ export async function GET(req: Request) {
               <div
                 style={{
                   display: "flex",
-                  fontSize: 42,
+                  marginTop: 8,
+                  fontSize: 54,
                   fontWeight: 900,
+                  lineHeight: 1,
                 }}
               >
                 Daily Recap
@@ -406,12 +279,11 @@ export async function GET(req: Request) {
 
               <div
                 style={{
-                  marginTop: 0,
                   display: "flex",
-                  fontSize: 17,
-                  color:
-                    "rgba(255,255,255,0.55)",
-                  fontWeight: 700,
+                  marginTop: 8,
+                  fontSize: 18,
+                  color: "rgba(255,255,255,0.72)",
+                  lineHeight: 1,
                 }}
               >
                 Official Session Results
@@ -422,140 +294,127 @@ export async function GET(req: Request) {
           <div
             style={{
               display: "flex",
-              fontSize: 29,
-              opacity: 0.72,
+              fontSize: 28,
+              opacity: 0.78,
+              paddingTop: 8,
             }}
           >
             {date}
           </div>
         </div>
 
-        {/* Daily total */}
+        {/* Total Day Result */}
         <div
           style={{
-            marginTop: 8,
-            borderRadius: "28px",
-            border:
-              "2px solid rgba(215,177,74,0.55)",
-            backgroundColor:
-              "rgba(215,177,74,0.06)",
+            marginTop: 18,
+            borderRadius: 28,
+            border: "2px solid rgba(215,177,74,0.42)",
+            background:
+              "linear-gradient(135deg, rgba(140,95,255,0.10), rgba(215,177,74,0.10))",
             display: "flex",
             alignItems: "center",
-            justifyContent:
-              "space-between",
-            padding: "16px 44px",
+            justifyContent: "space-between",
+            padding: "22px 30px",
           }}
         >
           <div
             style={{
               display: "flex",
-              fontSize: 94,
-              fontWeight: 900,
-              lineHeight: 1,
-              color:
-                dailyNet >= 0
-                  ? "#55FF8A"
-                  : "#ff5c5c",
+              alignItems: "center",
+              width: "55%",
             }}
           >
-            {fmtNet(dailyNet)}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  color: "#D7B14A",
+                  fontSize: 20,
+                  fontWeight: 900,
+                  letterSpacing: 0.6,
+                }}
+              >
+                TOTAL DAY RESULT
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: 8,
+                  fontSize: 84,
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  color: dailyNet >= 0 ? "#55FF8A" : "#ff5c5c",
+                }}
+              >
+                {fmtNet(dailyNet)}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                width: 1,
+                height: 70,
+                backgroundColor: "rgba(255,255,255,0.16)",
+                marginRight: 8,
+              }}
+            />
           </div>
 
           <div
             style={{
               display: "flex",
-              width: "1px",
-              height: "68px",
-              backgroundColor:
-                "rgba(255,255,255,0.18)",
-            }}
-          />
-
-          <div
-            style={{
-              display: "flex",
-              gap: 38,
+              gap: 34,
+              alignItems: "center",
             }}
           >
-            <MiniStat
-              label="TP"
-              value={daily.w}
-              color="#55FF8A"
-            />
-
-            <MiniStat
-              label="SL"
-              value={daily.l}
-              color="#ff5c5c"
-            />
-
-            <MiniStat
-              label="BE"
-              value={daily.be}
-              color="#D7B14A"
-            />
-
-            <MiniStat
-              label="WR"
-              value={winRate(
-                daily.w,
-                daily.l
-              )}
-              color="#D7B14A"
-            />
+            <MiniStat label="TP" value={daily.w} color="#55FF8A" />
+            <MiniStat label="SL" value={daily.l} color="#ff5c5c" />
+            <MiniStat label="BE" value={daily.be} color="#D7B14A" />
+            <MiniStat label="WR" value={winRate(daily.w, daily.l)} color="#D7B14A" />
           </div>
         </div>
 
-        {/* Session cards */}
+        {/* Session Cards */}
         <div
           style={{
-            marginTop: 14,
+            marginTop: 16,
             display: "flex",
-            gap: 28,
+            gap: 22,
           }}
         >
-          {sessionResults.map((result) => {
-            const colors = sessionColor(
-              result.session
-            );
-
-            const isBest =
-              bestSession?.session ===
-              result.session;
-
-            const borderColor = isBest
-              ? "rgba(215,177,74,0.95)"
-              : colors.border;
-
-            const titleColor = isBest
-              ? "#f0c75a"
-              : colors.accent;
-
-            const backgroundColor = isBest
-              ? "rgba(215,177,74,0.10)"
-              : colors.background;
-
-            const cardShadow = isBest
-              ? "0 0 22px rgba(215,177,74,0.18), 0 0 40px rgba(215,177,74,0.08), inset 0 0 18px rgba(215,177,74,0.05)"
-              : "none";
-
-            const streak =
-              sessionStreaks[
-                result.session
-              ];
+          {sessionCards.map((s) => {
+            const isWinner = winnerSet.has(s.session);
+            const headerColor = isWinner ? "#D7B14A" : s.accent;
+            const lineColor = isWinner
+              ? "rgba(215,177,74,0.72)"
+              : `${s.accent}99`;
 
             return (
               <div
-                key={result.session}
+                key={s.session}
                 style={{
                   flex: 1,
-                  borderRadius: "20px",
-                  border: `2px solid ${borderColor}`,
-                  backgroundColor,
+                  borderRadius: 22,
+                  border: isWinner
+                    ? "2px solid rgba(215,177,74,0.72)"
+                    : `2px solid ${s.accent}cc`,
+                  background: isWinner
+                    ? "linear-gradient(135deg, rgba(215,177,74,0.16), rgba(255,255,255,0.04))"
+                    : "rgba(255,255,255,0.03)",
+                  boxShadow: isWinner
+                    ? "0 0 24px rgba(215,177,74,0.16)"
+                    : "none",
                   display: "flex",
                   flexDirection: "column",
-                  padding: "14px 18px",
-                  boxShadow: cardShadow,
+                  padding: "18px 20px 16px",
                 }}
               >
                 <div
@@ -568,125 +427,93 @@ export async function GET(req: Request) {
                   <div
                     style={{
                       display: "flex",
-                      color: titleColor,
-                      fontSize: 26,
+                      color: headerColor,
+                      fontSize: 24,
                       fontWeight: 900,
-                      textShadow: isBest
-                        ? "0 0 10px rgba(215,177,74,0.22)"
-                        : "none",
+                      lineHeight: 1,
                     }}
                   >
-                    {sessionName(
-                      result.session
-                    )}
+                    {s.flag} {s.label}
                   </div>
 
-                  {streak >= 2 && (
+                  {s.streak >= 2 ? (
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 5,
+                        gap: 6,
+                        padding: "4px 10px",
                         borderRadius: 999,
-                        border:
-                          "1px solid rgba(215,177,74,0.28)",
-                        backgroundColor:
-                          "rgba(215,177,74,0.08)",
-                        padding: "4px 8px",
+                        border: "1px solid rgba(215,177,74,0.35)",
+                        backgroundColor: "rgba(215,177,74,0.10)",
                         color: "#D7B14A",
-                        fontSize: 16,
-                        fontWeight: 900,
+                        fontSize: 14,
+                        fontWeight: 800,
                         lineHeight: 1,
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                        }}
-                      >
-                        🔥
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                        }}
-                      >
-                        {streak}
-                      </div>
+                      🔥 {s.streak}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 <div
                   style={{
-                    marginTop: 9,
                     display: "flex",
-                    fontSize: 22,
+                    marginTop: 18,
+                    fontSize: 20,
+                    color: "rgba(255,255,255,0.92)",
                   }}
                 >
-                  TP {result.w} • SL{" "}
-                  {result.l} • BE{" "}
-                  {result.be}
+                  TP {s.w} • SL {s.l} • BE {s.be}
                 </div>
 
                 <div
                   style={{
-                    marginTop: 9,
                     display: "flex",
+                    marginTop: 12,
+                    height: 1,
                     width: "100%",
-                    height: "1px",
-                    backgroundColor:
-                      borderColor,
+                    backgroundColor: lineColor,
                   }}
                 />
 
                 <div
                   style={{
-                    marginTop: 10,
                     display: "flex",
-                    fontSize: 30,
+                    marginTop: 16,
+                    fontSize: 34,
                     fontWeight: 900,
-                    color:
-                      result.net >= 0
-                        ? "#55FF8A"
-                        : "#ff5c5c",
+                    lineHeight: 1,
+                    color: s.net >= 0 ? "#55FF8A" : "#ff5c5c",
                   }}
                 >
-                  Net {fmtNet(result.net)}
+                  Net {fmtNet(s.net)}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* WTD and MTD */}
+        {/* Bottom row */}
         <div
           style={{
-            marginTop: 14,
+            marginTop: 16,
             display: "flex",
-            gap: 28,
+            gap: 22,
           }}
         >
-          <TrendBox
-            title="Week to Date"
-            net={weekNet}
-            w={week.w}
-            l={week.l}
-          />
-
-          <TrendBox
-            title="Month to Date"
-            net={monthNet}
-            w={month.w}
-            l={month.l}
-          />
+          <TrendBox title="Week to Date" net={weekNet} w={week.w} l={week.l} />
+          <TrendBox title="Month to Date" net={monthNet} w={month.w} l={month.l} />
         </div>
       </div>
     ),
     {
       width: 1200,
-      height: 630,
+      height: 680,
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
     }
   );
 }
@@ -706,14 +533,16 @@ function MiniStat({
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        minWidth: 72,
       }}
     >
       <div
         style={{
           display: "flex",
           color,
-          fontSize: 26,
+          fontSize: 18,
           fontWeight: 900,
+          lineHeight: 1,
         }}
       >
         {label}
@@ -721,10 +550,11 @@ function MiniStat({
 
       <div
         style={{
-          marginTop: 6,
           display: "flex",
-          fontSize: 40,
+          marginTop: 10,
+          fontSize: 34,
           fontWeight: 900,
+          lineHeight: 1,
         }}
       >
         {value}
@@ -748,30 +578,29 @@ function TrendBox({
     <div
       style={{
         flex: 1,
-        borderRadius: "20px",
-        border:
-          "1px solid rgba(215,177,74,0.55)",
-        backgroundColor:
-          "rgba(215,177,74,0.055)",
+        borderRadius: 20,
+        border: "1px solid rgba(215,177,74,0.32)",
+        backgroundColor: "rgba(215,177,74,0.05)",
         display: "flex",
-        justifyContent:
-          "space-between",
         alignItems: "center",
-        padding: "12px 22px",
+        justifyContent: "space-between",
+        padding: "14px 20px",
       }}
     >
       <div
         style={{
           display: "flex",
           flexDirection: "column",
+          width: "62%",
         }}
       >
         <div
           style={{
             display: "flex",
             color: "#D7B14A",
-            fontSize: 25,
+            fontSize: 22,
             fontWeight: 900,
+            lineHeight: 1,
           }}
         >
           {title}
@@ -779,36 +608,32 @@ function TrendBox({
 
         <div
           style={{
-            marginTop: 5,
             display: "flex",
-            fontSize: 20,
-            opacity: 0.72,
+            marginTop: 8,
+            fontSize: 18,
+            color: "rgba(255,255,255,0.70)",
           }}
         >
-          TP {w} • SL {l} • WR{" "}
-          {winRate(w, l)}
+          TP {w} • SL {l} • WR {winRate(w, l)}
         </div>
       </div>
 
       <div
         style={{
           display: "flex",
-          width: "1px",
-          height: "48px",
-          backgroundColor:
-            "rgba(255,255,255,0.18)",
+          width: 1,
+          height: 50,
+          backgroundColor: "rgba(255,255,255,0.14)",
         }}
       />
 
       <div
         style={{
           display: "flex",
-          fontSize: 40,
+          fontSize: 38,
           fontWeight: 900,
-          color:
-            net >= 0
-              ? "#55FF8A"
-              : "#ff5c5c",
+          lineHeight: 1,
+          color: net >= 0 ? "#55FF8A" : "#ff5c5c",
         }}
       >
         {fmtNet(net)}
