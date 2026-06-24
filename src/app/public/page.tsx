@@ -6,6 +6,8 @@ import TopNav from "@/app/components/TopNav";
 
 type Session = "tokyo" | "london" | "nyc";
 
+type TF = "week" | "month" | "year" | "all";
+
 type SummaryCardKind = "weekly" | "monthly" | null;
 
 type DailyOverallRow = {

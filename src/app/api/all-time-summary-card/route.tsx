@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
 import { createClient } from "@supabase/supabase-js";
 
@@ -171,61 +172,6 @@ function formatFullDate(value: string) {
   });
 }
 
-async function fetchAllSessionRows(
-  supabase: ReturnType<typeof createClient>,
-  endDate: string
-) {
-  const pageSize = 1000;
-  const rows: DailySessionRow[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const to = from + pageSize - 1;
-
-    const result = await supabase
-      .from("v_public_daily_outcomes")
-      .select("date,session,wins,losses,breakevens")
-      .lte("date", endDate)
-      .order("date", { ascending: true })
-      .range(from, to);
-
-    if (result.error) throw result.error;
-
-    const page = (result.data ?? []) as DailySessionRow[];
-    rows.push(...page);
-
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
-
-async function fetchAllOverallRows(
-  supabase: ReturnType<typeof createClient>,
-  endDate: string
-) {
-  const pageSize = 1000;
-  const rows: DailyOverallRow[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const to = from + pageSize - 1;
-
-    const result = await supabase
-      .from("v_public_daily_overall")
-      .select("date,wins,losses,breakevens")
-      .lte("date", endDate)
-      .order("date", { ascending: true })
-      .range(from, to);
-
-    if (result.error) throw result.error;
-
-    const page = (result.data ?? []) as DailyOverallRow[];
-    rows.push(...page);
-
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -233,9 +179,59 @@ export async function GET(req: Request) {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  async function fetchAllSessionRows(endDate: string) {
+    const pageSize = 1000;
+    const rows: DailySessionRow[] = [];
+
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+
+      const result = await supabase
+        .from("v_public_daily_outcomes")
+        .select("date,session,wins,losses,breakevens")
+        .lte("date", endDate)
+        .order("date", { ascending: true })
+        .range(from, to);
+
+      if (result.error) throw result.error;
+
+      const page = (result.data ?? []) as DailySessionRow[];
+      rows.push(...page);
+
+      if (page.length < pageSize) break;
+    }
+
+    return rows;
+  }
+
+  async function fetchAllOverallRows(endDate: string) {
+    const pageSize = 1000;
+    const rows: DailyOverallRow[] = [];
+
+    for (let from = 0; ; from += pageSize) {
+      const to = from + pageSize - 1;
+
+      const result = await supabase
+        .from("v_public_daily_overall")
+        .select("date,wins,losses,breakevens")
+        .lte("date", endDate)
+        .order("date", { ascending: true })
+        .range(from, to);
+
+      if (result.error) throw result.error;
+
+      const page = (result.data ?? []) as DailyOverallRow[];
+      rows.push(...page);
+
+      if (page.length < pageSize) break;
+    }
+
+    return rows;
+  }
+
   const [allSessionRows, allOverallRows] = await Promise.all([
-    fetchAllSessionRows(supabase, date),
-    fetchAllOverallRows(supabase, date),
+    fetchAllSessionRows(date),
+    fetchAllOverallRows(date),
   ]);
 
   const bySession: Record<Session, SessionTotals> = {
@@ -368,6 +364,7 @@ export async function GET(req: Request) {
           >
             <img
               src={`${BASE_URL}/Kingdm-logo.png`}
+              alt="The Kingdm logo"
               width="96"
               height="96"
               style={{ display: "flex" }}
