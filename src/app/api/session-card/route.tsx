@@ -164,7 +164,7 @@ export async function GET(req: Request) {
                     <span
                       style={{
                         color: "#D7B14A",
-                        opacity: 0.72,
+                        opacity: 0.78,
                         fontWeight: 500,
                       }}
                     >
