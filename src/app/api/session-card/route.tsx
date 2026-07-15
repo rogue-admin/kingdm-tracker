@@ -154,13 +154,20 @@ export async function GET(req: Request) {
                         display: "flex",
                         marginLeft: 10,
                         marginRight: 10,
-                        opacity: 0.55,
+                        color: "#D7B14A",
+                        opacity: 0.45,
                       }}
                     >
                       •
                     </span>
 
-                    <span>
+                    <span
+                      style={{
+                        color: "#D7B14A",
+                        opacity: 0.72,
+                        fontWeight: 500,
+                      }}
+                    >
                       {tradesTaken}{" "}
                       {tradesTaken === 1
                         ? "trade taken"
