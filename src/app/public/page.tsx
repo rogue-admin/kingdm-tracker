@@ -1184,7 +1184,7 @@ useEffect(() => {
         session: "London Session",
         etTime: "02:50",
         days: [1, 2, 3, 4],
-        instruments: "Oil, GER30 and Gold",
+        instruments: "UK100 and DAX",
       },
       {
         id: "nyc-mamba",

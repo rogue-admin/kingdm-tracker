@@ -15,6 +15,7 @@ type OfficialSessionRow = {
   wins: number;
   losses: number;
   breakevens: number;
+  trades_taken: number | null;
 
   notes: string | null;
 
@@ -136,6 +137,7 @@ export default function AdminPage() {
   const [wins, setWins] = useState<string>("0");
   const [losses, setLosses] = useState<string>("0");
   const [breakevens, setBreakevens] = useState<string>("0");
+  const [tradesTaken, setTradesTaken] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
   // UI state
@@ -156,10 +158,12 @@ export default function AdminPage() {
   const winsN = useMemo(() => parseIntOrNull(wins), [wins]);
   const lossesN = useMemo(() => parseIntOrNull(losses), [losses]);
   const breakevensN = useMemo(() => parseIntOrNull(breakevens), [breakevens]);
+  const tradesTakenN = useMemo(() => parseIntOrNull(tradesTaken), [tradesTaken]);
 
   const winsRef = useRef<HTMLInputElement | null>(null);
   const lossesRef = useRef<HTMLInputElement | null>(null);
   const beRef = useRef<HTMLInputElement | null>(null);
+  const tradesTakenRef = useRef<HTMLInputElement | null>(null);
   const notesRef = useRef<HTMLInputElement | null>(null);
 
   // -------------------------
@@ -278,6 +282,7 @@ export default function AdminPage() {
     setWins("0");
     setLosses("0");
     setBreakevens("0");
+    setTradesTaken("");
     setNotes("");
     setStatus(null);
     setError(null);
@@ -291,6 +296,7 @@ export default function AdminPage() {
     setWins(String(row.wins ?? 0));
     setLosses(String(row.losses ?? 0));
     setBreakevens(String(row.breakevens ?? 0));
+    setTradesTaken(row.trades_taken === null || row.trades_taken === undefined ? "" : String(row.trades_taken));
     setNotes(row.notes ?? "");
     setStatus(null);
     setError(null);
@@ -305,6 +311,11 @@ export default function AdminPage() {
 function focusBreakEvens() {
   beRef.current?.focus();
   beRef.current?.select();
+}
+
+function focusTradesTaken() {
+  tradesTakenRef.current?.focus();
+  tradesTakenRef.current?.select();
 }
 
 function focusNotes() {
@@ -383,6 +394,9 @@ function onNumberFieldKeyDown(
   if (winsN === null) return setError("Wins must be a non-negative whole number.");
   if (lossesN === null) return setError("Losses must be a non-negative whole number.");
   if (breakevensN === null) return setError("Break-evens must be a non-negative whole number.");
+  if (tradesTaken.trim() !== "" && (tradesTakenN === null || tradesTakenN < 1)) {return setError("Trades Taken must be a whole number of 1 or greater.");
+    
+  }
 
   setLoading(true);
   try {
@@ -392,6 +406,7 @@ function onNumberFieldKeyDown(
       wins: winsN,
       losses: lossesN,
       breakevens: breakevensN,
+      trades_taken: tradesTaken.trim() === "" ? null : tradesTakenN,
       notes: notes.trim() ? notes.trim() : null,
     };
 
@@ -423,6 +438,12 @@ function onNumberFieldKeyDown(
     if (lossesN === null) return setError("Losses must be a non-negative whole number.");
     if (breakevensN === null) return setError("Break-evens must be a non-negative whole number.");
 
+    if (tradesTaken.trim() !== "" && (tradesTakenN === null || tradesTakenN < 1)) {
+      return setError(
+        "Trades Taken must be a whole number of 1 or greater."
+      );
+    }
+
     const ok = window.confirm(
       `Publish ${session.toUpperCase()} session result for ${date} to Discord?`
     );
@@ -439,6 +460,8 @@ function onNumberFieldKeyDown(
             wins: winsN,
             losses: lossesN,
             breakevens: breakevensN,
+            trades_taken:
+              tradesTaken.trim() === "" ? null : tradesTakenN,
             notes: notes.trim() || null,
           },
         }
@@ -1085,7 +1108,7 @@ border: "1px solid rgba(215,177,74,0.18)",
   <div
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(3, 160px)",
+    gridTemplateColumns: "repeat(4, 160px)",
     gap: 14,
     justifyContent: "center",
     alignItems: "end",
@@ -1145,7 +1168,7 @@ border: "1px solid rgba(215,177,74,0.18)",
         ref={beRef}
         value={breakevens}
         onChange={(e) => setBreakevens(e.target.value)}
-        onKeyDown={(e) => onNumberFieldKeyDown(e, focusNotes)}
+        onKeyDown={(e) => onNumberFieldKeyDown(e, focusTradesTaken)}
         inputMode="numeric"
         pattern="[0-9]*"
         placeholder="0"
@@ -1161,6 +1184,34 @@ border: "1px solid rgba(215,177,74,0.18)",
               e.currentTarget.style.transform = "translateY(0)";
             }}
         />
+    </label>
+
+        <label style={{ display: "grid", gap: 8 }}>
+      <span style={fieldLabelStyle}>Trades Taken</span>
+
+      <input
+        ref={tradesTakenRef}
+        value={tradesTaken}
+        onChange={(e) => setTradesTaken(e.target.value)}
+        onKeyDown={(e) => onNumberFieldKeyDown(e, focusNotes)}
+        inputMode="numeric"
+        pattern="[0-9]*"
+        placeholder="Optional"
+        style={compactNumberInputStyle}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor =
+            "rgba(215,177,74,0.36)";
+          e.currentTarget.style.boxShadow =
+            "0 0 0 3px rgba(215,177,74,0.10), 0 0 18px rgba(140,95,255,0.16)";
+          e.currentTarget.style.transform = "translateY(-1px)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor =
+            "rgba(255,255,255,0.10)";
+          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.transform = "translateY(0)";
+        }}
+      />
     </label>
   </div>
 

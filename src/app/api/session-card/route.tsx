@@ -46,6 +46,17 @@ export async function GET(req: Request) {
   const losses = Number(url.searchParams.get("losses") ?? 0);
   const be = Number(url.searchParams.get("be") ?? 0);
 
+  const tradesParam = url.searchParams.get("trades");
+  const tradesTaken =
+    tradesParam !== null && tradesParam.trim() !== ""
+      ? Number(tradesParam)
+      : null;
+
+  const hasTradeCount =
+    tradesTaken !== null &&
+    Number.isInteger(tradesTaken) &&
+    tradesTaken >= 1;
+
   const net = wins - losses;
   const positive = net >= 0;
   const info = sessionInfo(session);
@@ -120,15 +131,43 @@ export async function GET(req: Request) {
                 <span>{info.label}</span>
               </div>
 
-              <div
+                            <div
                 style={{
                   display: "flex",
+                  alignItems: "center",
                   marginTop: 10,
                   fontSize: 20,
                   opacity: 0.62,
                 }}
               >
-                Official Session Results
+                <span>Official Session Results</span>
+
+                {hasTradeCount && (
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        marginLeft: 10,
+                        marginRight: 10,
+                        opacity: 0.55,
+                      }}
+                    >
+                      •
+                    </span>
+
+                    <span>
+                      {tradesTaken}{" "}
+                      {tradesTaken === 1
+                        ? "trade taken"
+                        : "trades taken"}
+                    </span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
